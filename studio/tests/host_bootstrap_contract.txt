@@ -1,6 +1,0 @@
-NEW projects do not require *.ppt-recovery.zip.
-RESUME projects use project_state.json or a verified *.ppt-recovery.zip.
-SHA resolution order: GitHub Connector -> public GitHub Web/API.
-Runtime release tag: studio-runtime-<SHA>.
-Runtime release asset: ppt-master-studio-runtime-<SHA>.zip.
-Ordinary handoff/source ZIP is not a Recovery Bundle.
