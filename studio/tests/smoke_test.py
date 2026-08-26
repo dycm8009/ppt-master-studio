@@ -20,6 +20,10 @@ def main():
     assert v['host_bootstrap_revision']>=2
     assert v['runtime_release_tag_pattern']=='studio-runtime-{commit}'
     assert v['runtime_release_asset_pattern']=='ppt-master-studio-runtime-{commit}.zip'
+    contract=json.loads((ROOT/'studio/tests/host_bootstrap_contract.json').read_text())
+    assert contract['new_project_requires_recovery_bundle'] is False
+    assert contract['sha_resolution_order']==['github_connector','public_github_web_api']
+    assert contract['ordinary_handoff_zip_is_recovery_bundle'] is False
     instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
     bootstrap=(ROOT/'studio/PROJECT_BOOTSTRAP.md').read_text(encoding='utf-8')
     assert 'NEW 项目不需要 *.ppt-recovery.zip' in instructions
