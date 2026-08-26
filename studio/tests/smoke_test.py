@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 PY=sys.executable
-SHA='0123456789abcdef0123456789abcdef01234567'
+SHA=subprocess.run(['git','-C',str(ROOT),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip().lower()
 
 def run(*args, ok=True):
     p=subprocess.run([PY,*map(str,args)],cwd=ROOT,text=True,capture_output=True)
