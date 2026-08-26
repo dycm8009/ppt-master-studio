@@ -20,5 +20,7 @@ jobs:
           python-version: '3.11'
       - name: Compile Studio scripts
         run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py
+      - name: Load Static UI Adapter
+        run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio smoke tests
         run: python studio/tests/smoke_test.py
