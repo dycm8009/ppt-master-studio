@@ -1,0 +1,42 @@
+name: Studio Runtime Release
+
+on:
+  push:
+    branches: [studio-main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Build commit-bound runtime bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          ASSET="ppt-master-studio-runtime-${SHA}.zip"
+          rm -f "$ASSET" "$ASSET.sha256"
+          zip -qr "$ASSET" . -x '.git/*' "$ASSET" "$ASSET.sha256"
+          sha256sum "$ASSET" > "$ASSET.sha256"
+      - name: Create or update runtime release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          TAG="studio-runtime-${SHA}"
+          ASSET="ppt-master-studio-runtime-${SHA}.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+          else
+            gh release create "$TAG" "$ASSET" "$ASSET.sha256" \
+              --target "$SHA" \
+              --title "PPT Master Studio Runtime ${SHA}" \
+              --notes "Commit-bound runtime bundle for PPT Master Studio. Source authority remains GitHub commit ${SHA}; this ZIP is an executable distribution artifact, not a project Recovery Bundle."
+          fi
