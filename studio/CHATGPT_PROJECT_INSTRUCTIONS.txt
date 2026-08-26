@@ -16,30 +16,31 @@ Upstream mirror branch: main
 【NEW：GitHub Host Bootstrap】
 1. 必须先解析 studio-main 当前 HEAD 的完整 40 位 commit SHA。优先调用已连接的 GitHub Connector 读取 `dycm8009/ppt-master-studio` 的 `studio-main` branch metadata；如果 Connector 调用失败或当前宿主未暴露该 Connector，再使用公共 GitHub Web/API 读取同一 branch。只有这两条解析路径都失败时，才允许因“无法解析稳定 SHA”而 Fail Closed，并必须说明已尝试的路径。
 2. 解析到 SHA 后，该 PPT 项目生命周期锁定该 SHA，不继续追踪移动中的 studio-main。
-3. 优先从 GitHub Releases 获取与该 SHA 一一对应的 Runtime Bundle：tag=`studio-runtime-<SHA>`，asset=`ppt-master-studio-runtime-<SHA>.zip`。该 ZIP 是 GitHub 自动生成的可执行 Harness 快照，不是项目 Recovery Bundle。
-4. 若 Runtime Release 暂时不存在，允许回退到该精确 SHA 的仓库 archive/checkout；不得回退到另一 commit，也不得要求用户上传 Recovery ZIP 来代替新项目 Harness。
-5. 将该精确 commit 的源码物化到当前运行环境后，读取 `studio/VERSION.json`、`studio/PROJECT_BOOTSTRAP.md`、`skills/ppt-master/SKILL.md`；运行官方 attribution_guard；再读取 Studio Authority/Workflow/Template/Regression，serverless/ChatGPT 还必须读取 Static UI/Recovery Rules。
-6. 运行：`python3 studio/scripts/enforced_bootstrap.py --repo-root <repo-root> --running-commit <PINNED_SHA>`。失败即停止，不得绕过。
-7. 读取官方 `skills/ppt-master/workflows/routing.md`，选择且只选择一个顶层工作流；官方 workflow 是执行核心，Studio 只叠加宿主适配与质量策略。
-8. 创建初始 `project_state.json` checkpoint，并写入 repository=`dycm8009/ppt-master-studio`、ref=`studio-main`、commit=`<PINNED_SHA>`。
+3. 在 ChatGPT 宿主中，首选通过 GitHub Connector 获取该 SHA 对应的 `Studio Runtime Release` workflow run，然后获取名为 `ppt-master-studio-runtime` 的 workflow artifact，并用 Connector 的 artifact download 能力下载到当前运行环境。该 artifact 内包含 `ppt-master-studio-runtime-<SHA>.zip` 及其 SHA-256 文件。
+4. 如果 workflow artifact 不可用或已过期，再使用永久 GitHub Release：tag=`studio-runtime-<SHA>`，asset=`ppt-master-studio-runtime-<SHA>.zip`。该 ZIP 是 GitHub 自动生成的可执行 Harness 快照，不是项目 Recovery Bundle。
+5. 如果 Runtime Artifact/Release 均不可物化，最后才允许回退到该精确 SHA 的仓库 archive/checkout；不得回退到另一 commit，也不得要求用户上传 Recovery ZIP 来代替新项目 Harness。只有这些 materialization 路径全部失败时才 Fail Closed。
+6. 将该精确 commit 的源码物化到当前运行环境后，读取 `studio/VERSION.json`、`studio/PROJECT_BOOTSTRAP.md`、`skills/ppt-master/SKILL.md`；运行官方 attribution_guard；再读取 Studio Authority/Workflow/Template/Regression，serverless/ChatGPT 还必须读取 Static UI/Recovery Rules。
+7. 运行：`python3 studio/scripts/enforced_bootstrap.py --repo-root <repo-root> --running-commit <PINNED_SHA>`。失败即停止，不得绕过。
+8. 读取官方 `skills/ppt-master/workflows/routing.md`，选择且只选择一个顶层工作流；官方 workflow 是执行核心，Studio 只叠加宿主适配与质量策略。
+9. 创建初始 `project_state.json` checkpoint，并写入 repository=`dycm8009/ppt-master-studio`、ref=`studio-main`、commit=`<PINNED_SHA>`。
 
 【RESUME：已有 PPT / 新聊天 / 环境重置】
-9. 优先读取 project_state.json。若存在 harness.commit，必须加载该精确 commit，而不是当前 studio-main 最新 HEAD。
-10. 若 project_state.json 或工程目录因运行环境重置而丢失，先寻找/要求最近一次 `*.ppt-recovery.zip`，校验 manifest 与 SHA-256 后恢复，再运行 `enforced_preflight.py <project> --running-commit <PINNED_SHA>`。
-11. Recovery Bundle 只对 RESUME/恢复路径有权威性；没有有效 Recovery Bundle 且续作所需真实工件已经丢失时必须 Fail Closed。不得根据聊天记忆伪造 project_state、spec_lock、accepted receipts、SVG 或 QA 结果。
-12. 如果用户提供的是普通 handoff/source ZIP，而不是含 `PPT_MASTER_RECOVERY_MANIFEST.json` 且 schema 为 `ppt-master-portable-recovery/*` 的 Recovery Bundle，必须把它当作输入材料，而不是恢复凭证。
-13. 只有用户明确要求升级一个正在进行的项目时，才允许做 Harness migration；不得静默把旧项目升级到 studio-main 最新版本。
+10. 优先读取 project_state.json。若存在 harness.commit，必须加载该精确 commit，而不是当前 studio-main 最新 HEAD。
+11. 若 project_state.json 或工程目录因运行环境重置而丢失，先寻找/要求最近一次 `*.ppt-recovery.zip`，校验 manifest 与 SHA-256 后恢复，再运行 `enforced_preflight.py <project> --running-commit <PINNED_SHA>`。
+12. Recovery Bundle 只对 RESUME/恢复路径有权威性；没有有效 Recovery Bundle 且续作所需真实工件已经丢失时必须 Fail Closed。不得根据聊天记忆伪造 project_state、spec_lock、accepted receipts、SVG 或 QA 结果。
+13. 如果用户提供的是普通 handoff/source ZIP，而不是含 `PPT_MASTER_RECOVERY_MANIFEST.json` 且 schema 为 `ppt-master-portable-recovery/*` 的 Recovery Bundle，必须把它当作输入材料，而不是恢复凭证。
+14. 只有用户明确要求升级一个正在进行的项目时，才允许做 Harness migration；不得静默把旧项目升级到 studio-main 最新版本。
 
 【ChatGPT 静态交互】
-14. Default Generate 的用户决策闭环使用 Studio Static UI Adapter：Stage 1（Communication + Template）→ Stage 2（Final Deck Plan）→ Deck Review；Custom Motion 被激活时增加 Motion Review。HTML 仅做本地交互并输出 JSON，用户回传后必须用 static_ui_adapter.py validate 生成 accepted receipt，不能凭聊天文字假定 Gate 已通过。
-15. Stage 1/2 固定 UI 随用户语言本地化；canonical IDs/enum 保持官方值。Stage 2 三套方向必须提供整页视觉样本；Visual Style、Mode、Icons、Image Strategy 必须提供各自适合的视觉/语义反馈，不能退化为仅文字+色板。
+15. Default Generate 的用户决策闭环使用 Studio Static UI Adapter：Stage 1（Communication + Template）→ Stage 2（Final Deck Plan）→ Deck Review；Custom Motion 被激活时增加 Motion Review。HTML 仅做本地交互并输出 JSON，用户回传后必须用 static_ui_adapter.py validate 生成 accepted receipt，不能凭聊天文字假定 Gate 已通过。
+16. Stage 1/2 固定 UI 随用户语言本地化；canonical IDs/enum 保持官方值。Stage 2 三套方向必须提供整页视觉样本；Visual Style、Mode、Icons、Image Strategy 必须提供各自适合的视觉/语义反馈，不能退化为仅文字+色板。
 
 【长 Deck / 图片 / 动画 / QA】
-16. 18 页及以上执行 Studio Deck-level Art Direction：Deck Rhythm、Composition Diversity、Primary Visual Carrier、Section Personality、Similarity Gate；默认同一构图连续不超过 2 页，禁止“标题+卡片”万能回退。
-17. 图片依次经过 Image Opportunity → Semantic Necessity → Template Compatibility → Image Role Fitness → Treatment & Placement；图片不是多样性配额，0 张图片合法。General + Dark Tech 默认 SVG-native，禁止 ambient/full-bleed raster/AI 背景和 dense HUD 概念图，除非真实证据型图片确有必要并放在明确内容容器中。
-18. 长 Deck 禁止 deck-wide auto animation；默认 transition none，章节边界可克制 fade；对象动画只服务讲解顺序并受 Motion Budget。Breathing/Anchor 页面默认静态。
-19. 最终导出前完成官方 SVG Quality Gate，并按 Studio 策略完成 Render Review、Deck Diversity/Similarity Audit、图片兼容性审计（如有）、Motion Audit（如有）、PPTX Postflight。Beautify/Convert 默认保持原始内容、事实与页序，除非用户明确授权改写。
+17. 18 页及以上执行 Studio Deck-level Art Direction：Deck Rhythm、Composition Diversity、Primary Visual Carrier、Section Personality、Similarity Gate；默认同一构图连续不超过 2 页，禁止“标题+卡片”万能回退。
+18. 图片依次经过 Image Opportunity → Semantic Necessity → Template Compatibility → Image Role Fitness → Treatment & Placement；图片不是多样性配额，0 张图片合法。General + Dark Tech 默认 SVG-native，禁止 ambient/full-bleed raster/AI 背景和 dense HUD 概念图，除非真实证据型图片确有必要并放在明确内容容器中。
+19. 长 Deck 禁止 deck-wide auto animation；默认 transition none，章节边界可克制 fade；对象动画只服务讲解顺序并受 Motion Budget。Breathing/Anchor 页面默认静态。
+20. 最终导出前完成官方 SVG Quality Gate，并按 Studio 策略完成 Render Review、Deck Diversity/Similarity Audit、图片兼容性审计（如有）、Motion Audit（如有）、PPTX Postflight。Beautify/Convert 默认保持原始内容、事实与页序，除非用户明确授权改写。
 
 【GitHub 分支纪律】
-20. main 保持 upstream 镜像；studio-main 只放通过回归的稳定 Studio Overlay；studio-dev 用于修改和测试。普通 PPT 永远不使用 studio-dev，除非用户明确要求测试开发版。
-21. Studio 修改先进入 studio-dev，GitHub Actions regression 通过后用 PR 晋升到 studio-main。手工上传 ZIP 不再是源码 authority；Runtime Release ZIP 由 GitHub 自动生成并与稳定 commit SHA 绑定。
+21. main 保持 upstream 镜像；studio-main 只放通过回归的稳定 Studio Overlay；studio-dev 用于修改和测试。普通 PPT 永远不使用 studio-dev，除非用户明确要求测试开发版。
+22. Studio 修改先进入 studio-dev，GitHub Actions regression 通过后用 PR 晋升到 studio-main。手工上传 ZIP 不再是源码 authority；Runtime Artifact/Release 由 GitHub 自动生成并与稳定 commit SHA 绑定。
