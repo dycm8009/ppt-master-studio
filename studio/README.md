@@ -15,6 +15,20 @@ A PPT project resolves the current `studio-main` HEAD once, records the exact co
 in `project_state.json`, and stays on that commit until the user explicitly requests a
 Harness migration. "Latest" is a project-start behavior, not a mid-project behavior.
 
+## Host bootstrap
+
+A NEW project is different from a RESUME project. NEW projects resolve the stable SHA
+through the connected GitHub connector, with public GitHub Web/API as fallback, and do
+not require a project Recovery Bundle.
+
+Every stable `studio-main` commit publishes a commit-bound GitHub Runtime Release:
+
+- tag: `studio-runtime-<SHA>`
+- asset: `ppt-master-studio-runtime-<SHA>.zip`
+
+The Runtime ZIP is an executable distribution snapshot of the Harness. It is not a
+`*.ppt-recovery.zip` and does not contain project continuation authority.
+
 ## Overlay responsibilities
 
 - human confirmation on serverless ChatGPT hosts through static HTML surfaces

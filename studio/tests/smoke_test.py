@@ -15,7 +15,22 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.2.0'
+    assert v['studio_version']=='3.2.1'
+    assert v['project_contract_version']=='3.2.0'
+    assert v['host_bootstrap_revision']>=2
+    assert v['runtime_release_tag_pattern']=='studio-runtime-{commit}'
+    assert v['runtime_release_asset_pattern']=='ppt-master-studio-runtime-{commit}.zip'
+    contract=json.loads((ROOT/'studio/tests/host_bootstrap_contract.json').read_text())
+    assert contract['new_project_requires_recovery_bundle'] is False
+    assert contract['sha_resolution_order']==['github_connector','public_github_web_api']
+    assert contract['ordinary_handoff_zip_is_recovery_bundle'] is False
+    instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
+    bootstrap=(ROOT/'studio/PROJECT_BOOTSTRAP.md').read_text(encoding='utf-8')
+    assert 'NEW 项目不需要 *.ppt-recovery.zip' in instructions
+    assert 'GitHub Connector' in instructions and '公共 GitHub Web/API' in instructions
+    assert 'studio-runtime-<SHA>' in instructions and '普通 handoff/source ZIP' in instructions
+    assert 'A brand-new project does **not** require a Recovery Bundle.' in bootstrap
+    assert (ROOT/'.github/workflows/studio-runtime-release.yml').is_file()
     run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
     with tempfile.TemporaryDirectory() as td:
         base=Path(td); project=base/'project'

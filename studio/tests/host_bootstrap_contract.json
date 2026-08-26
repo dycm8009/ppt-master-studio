@@ -1,0 +1,9 @@
+{
+  "schema": "ppt-master-studio-host-bootstrap-contract/v2",
+  "new_project_requires_recovery_bundle": false,
+  "resume_requires_verified_evidence_when_state_lost": true,
+  "sha_resolution_order": ["github_connector", "public_github_web_api"],
+  "runtime_release_tag_pattern": "studio-runtime-{commit}",
+  "runtime_release_asset_pattern": "ppt-master-studio-runtime-{commit}.zip",
+  "ordinary_handoff_zip_is_recovery_bundle": false
+}

@@ -13,6 +13,7 @@ REQUIRED = [
     'skills/ppt-master/scripts/project_manager.py',
     'studio/VERSION.json',
     'studio/PROJECT_BOOTSTRAP.md',
+    'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt',
     'studio/enforcement/PPT_MASTER_AUTHORITY.md',
     'studio/enforcement/PPT_MASTER_WORKFLOW.md',
     'studio/enforcement/PPT_MASTER_TEMPLATE_RULES.md',
@@ -26,6 +27,8 @@ REQUIRED = [
     'studio/scripts/enforced_recovery.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
+STUDIO_VERSION = '3.2.1'
+PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
     try:
@@ -51,9 +54,13 @@ def main():
     actual=git_head(root)
     if actual and actual != requested: errors.append(f'checkout HEAD {actual} does not match requested commit {requested}')
     if version.get('repository')!='dycm8009/ppt-master-studio': errors.append('VERSION.json repository mismatch')
-    if version.get('studio_version')!='3.2.0': errors.append('VERSION.json studio_version mismatch')
+    if version.get('studio_version')!=STUDIO_VERSION: errors.append('VERSION.json studio_version mismatch')
+    if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
+    if int(version.get('host_bootstrap_revision') or 0) < 2: errors.append('VERSION.json host_bootstrap_revision must be >= 2')
+    if version.get('runtime_release_tag_pattern')!='studio-runtime-{commit}': errors.append('VERSION.json runtime release tag pattern mismatch')
+    if version.get('runtime_release_asset_pattern')!='ppt-master-studio-runtime-{commit}.zip': errors.append('VERSION.json runtime release asset pattern mismatch')
     status='passed' if not missing and not errors else 'failed'
-    report={'schema':'ppt-master-studio-bootstrap/v1','studio_version':version.get('studio_version','3.2.0'),'upstream_skill_version':version.get('upstream_skill_version','5.0.0'),'repo_root':str(root),'repository':version.get('repository'),'running_commit':requested,'checkout_head':actual,'status':status,'missing':missing,'errors':errors}
+    report={'schema':'ppt-master-studio-bootstrap/v1','studio_version':version.get('studio_version',STUDIO_VERSION),'project_contract_version':version.get('project_contract_version',PROJECT_CONTRACT_VERSION),'upstream_skill_version':version.get('upstream_skill_version','5.0.0'),'repo_root':str(root),'repository':version.get('repository'),'running_commit':requested,'checkout_head':actual,'host_bootstrap_revision':version.get('host_bootstrap_revision'),'status':status,'missing':missing,'errors':errors}
     text=json.dumps(report,ensure_ascii=False,indent=2); print(text)
     if args.json:
         args.json.parent.mkdir(parents=True,exist_ok=True); args.json.write_text(text+'\n',encoding='utf-8')
