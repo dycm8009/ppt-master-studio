@@ -1,0 +1,24 @@
+name: Studio Regression
+
+on:
+  push:
+    branches: [studio-dev, studio-main]
+  pull_request:
+    branches: [studio-main]
+    paths:
+      - 'studio/**'
+      - '.github/workflows/studio-regression.yml'
+      - 'skills/ppt-master/**'
+
+jobs:
+  overlay-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Studio scripts
+        run: python -m py_compile studio/scripts/*.py studio/tests/*.py
+      - name: Studio smoke tests
+        run: python studio/tests/smoke_test.py
