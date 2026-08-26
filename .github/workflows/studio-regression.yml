@@ -19,6 +19,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile Studio scripts
-        run: python -m py_compile studio/scripts/*.py studio/tests/*.py
+        run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py
       - name: Studio smoke tests
         run: python studio/tests/smoke_test.py
