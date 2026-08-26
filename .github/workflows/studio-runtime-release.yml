@@ -23,6 +23,15 @@ jobs:
           rm -f "$ASSET" "$ASSET.sha256"
           zip -qr "$ASSET" . -x '.git/*' "$ASSET" "$ASSET.sha256"
           sha256sum "$ASSET" > "$ASSET.sha256"
+      - name: Upload connector-downloadable runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppt-master-studio-runtime
+          path: |
+            ppt-master-studio-runtime-${{ github.sha }}.zip
+            ppt-master-studio-runtime-${{ github.sha }}.zip.sha256
+          retention-days: 90
+          if-no-files-found: error
       - name: Create or update runtime release
         env:
           GH_TOKEN: ${{ github.token }}
