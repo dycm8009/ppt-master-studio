@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["new_project_requires_recovery_bundle", "sha_resolution_order", "runtime_release_tag_pattern", "runtime_release_asset_pattern", "ordinary_handoff_zip_is_recovery_bundle"]
+}
