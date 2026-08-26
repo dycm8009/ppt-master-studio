@@ -1,6 +1,7 @@
 {
   "schema": "ppt-master-studio-version/v1",
-  "studio_version": "3.2.0",
+  "studio_version": "3.2.1",
+  "project_contract_version": "3.2.0",
   "upstream_skill_version": "5.0.0",
   "repository": "dycm8009/ppt-master-studio",
   "upstream_repository": "hugohe3/ppt-master",
@@ -10,5 +11,8 @@
   "static_ui_schema": "v1",
   "recovery_schema": "ppt-master-portable-recovery/v2",
   "project_state_schema": "ppt-master-studio-project-state/v1",
-  "channel_policy": "new projects resolve the current studio-main HEAD then pin that exact commit for the project lifetime"
+  "host_bootstrap_revision": 2,
+  "runtime_release_tag_pattern": "studio-runtime-{commit}",
+  "runtime_release_asset_pattern": "ppt-master-studio-runtime-{commit}.zip",
+  "channel_policy": "new projects resolve the current studio-main HEAD then pin that exact commit for the project lifetime; recovery is only for continuation, never a prerequisite for a brand-new project"
 }
