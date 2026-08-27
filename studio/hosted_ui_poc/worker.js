@@ -26,7 +26,10 @@ export default {
       catch (e) { return reply({error:String(e?.message||e)},400); }
     }
     if (url.pathname.match(/^\/s\/[0-9a-f]{48}$/)) {
-      return env.ASSETS.fetch(new Request(new URL('/index.html',url),request));
+      // Fetch the root asset internally instead of /index.html. Workers Static
+      // Assets canonicalizes /index.html to /, which would redirect the browser
+      // and drop the bearer token from the visible /s/<token> URL.
+      return env.ASSETS.fetch(new Request(new URL('/',url),request));
     }
     return env.ASSETS.fetch(request);
   }
