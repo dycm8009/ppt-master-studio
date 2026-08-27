@@ -10,3 +10,10 @@ Preserve upstream human-in-the-loop semantics on hosts that cannot maintain loca
 - Mode is a communication/narrative structure axis, separate from Visual Style; `custom` is valid. Fixed-mode changes should visibly change the structure preview, not pretend to change the visual skin.
 - `image_usage` changes must not silently rewrite user-authored `image_notes`; show allowed-source readout and warn on likely contradictions. `none` is exclusive.
 - Static HTML does not preserve the project filesystem; Portable Recovery checkpoints remain mandatory on serverless hosts.
+
+## Revision-safe HTML filenames
+
+- Every Static UI build must return a unique, versioned HTML filename containing a UTC build stamp and content digest. Reusing `confirm_stage1.html`, `confirm_stage2.html`, `deck_review.html`, or `motion_review.html` for mutable content is forbidden.
+- `static_ui/latest.json` is the machine-readable pointer to the current build for each surface. ChatGPT must surface/open the exact path returned by the latest `static_ui_adapter.py build` call, not a remembered earlier attachment or fixed alias.
+- Rebuilding a surface removes its legacy fixed-name HTML alias and retains only a bounded recent history (default 4 versions) to avoid stale-page ambiguity and uncontrolled Recovery growth.
+- Accepted receipts remain canonical fixed names (`accepted.stage1.json`, etc.) because they represent the current accepted state, not a browsable HTML revision. Digest validation remains authoritative even when an old HTML revision still exists.
