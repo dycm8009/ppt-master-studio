@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {dirname,join} from 'node:path';
 import {handleApiWithNamespace,SessionStore,SESSION_TTL_SECONDS} from './core.js';
 import {registerPptMasterSiteTools,SITE_TOOL_NAMES} from './public/site-tools.js';
+import {buildBootstrapUrl,decodeBootstrapHash,buildCaptureHash,decodeCaptureHash,BOOTSTRAP_PREFIX,CAPTURE_PREFIX} from './public/bootstrap.js';
 
 class MemoryStorage {
   constructor(now){this.map=new Map();this.alarm=null;this.deleted=false;this.now=now}
@@ -76,7 +77,7 @@ const expired=await handleApiWithNamespace(new Request(`https://poc.example/api/
 assert.equal(expired.status,404);
 assert.equal(sessions.object(c.session).storage.deleted,true);
 
-// Plus / Site Tools Host Bridge contract.
+// Plus / Site Tools optional compatibility contract.
 const registered=new Map();
 const modelContext={registerTool(tool){registered.set(tool.name,tool)}};
 const siteToken='c'.repeat(48);
@@ -127,11 +128,36 @@ assert.equal(siteCaptured.status,'captured');
 assert.deepEqual(siteCaptured.response,response);
 assert.equal(siteCaptured.harness_status,'not-validated');
 
+// B4 browser handoff contract: bootstrap and captured response stay in URL fragments.
+const bootstrapPayload={recommendation_sha256:'e'.repeat(64),options_sha256:'f'.repeat(64),recommendation:{audience:'AI 工程师',core_message:'Browser handoff'}};
+const bootstrapUrl=buildBootstrapUrl({origin:'https://poc.example',surface:'stage1',payload:bootstrapPayload});
+const parsedBootstrapUrl=new URL(bootstrapUrl);
+assert.equal(parsedBootstrapUrl.origin,'https://poc.example');
+assert.ok(parsedBootstrapUrl.hash.startsWith(BOOTSTRAP_PREFIX));
+const decodedBootstrap=decodeBootstrapHash(parsedBootstrapUrl.hash);
+assert.equal(decodedBootstrap.surface,'stage1');
+assert.deepEqual(decodedBootstrap.payload,bootstrapPayload);
+assert.equal(decodeBootstrapHash(''),null);
+assert.throws(()=>decodeBootstrapHash(`${BOOTSTRAP_PREFIX}%%%`),/invalid handoff encoding/);
+
+const browserToken='1'.repeat(48);
+const capturedHash=buildCaptureHash({session:browserToken,surface:'stage1',response,captured_at:'2026-08-27T11:10:00.000Z'});
+assert.ok(capturedHash.startsWith(CAPTURE_PREFIX));
+const decodedCapture=decodeCaptureHash(capturedHash);
+assert.equal(decodedCapture.status,'captured-not-validated');
+assert.equal(decodedCapture.session,browserToken);
+assert.equal(decodedCapture.harness_status,'not-validated');
+assert.deepEqual(decodedCapture.response,response);
+assert.equal(decodeCaptureHash(''),null);
+assert.throws(()=>buildCaptureHash({session:'bad',surface:'stage1',response}),/invalid session/);
+
 const here=dirname(fileURLToPath(import.meta.url));
 const html=await readFile(join(here,'public/index.html'),'utf8');
-assert.match(html,/Site Tools Host Bridge/);
+assert.match(html,/Browser Handoff Bridge/);
+assert.match(html,/decodeBootstrapHash/);
+assert.match(html,/buildCaptureHash/);
 assert.match(html,/registerPptMasterSiteTools/);
 assert.match(html,/template_selection:\{mode:'free_design',selection_keys:\[\]\}/);
 assert.doesNotMatch(html,/value="templates"/);
 
-console.log('hosted ui durable-object + site-tools transport: passed');
+console.log('hosted ui durable-object + site-tools + browser-handoff transport: passed');

@@ -20,12 +20,13 @@
 <body>
 <div class="wrap">
   <h1>PPT Master Hosted Confirm</h1>
-  <div class="muted">POC B3P：Plus 默认走 ChatGPT Site Tools；Hosted 服务只捕获选择，不自行授予 Harness accepted 状态。</div>
+  <div class="muted">POC B4：Plus 默认走 Browser Handoff；Site Tools 保留为可选加速层。Hosted 服务只捕获选择，不自行授予 Harness accepted 状态。</div>
   <div id="status" class="card">正在初始化…</div>
   <div id="app"></div>
 </div>
 <script type="module">
 import { registerPptMasterSiteTools } from '/site-tools.js';
+import { buildCaptureHash, decodeBootstrapHash, decodeCaptureHash } from '/bootstrap.js';
 
 const statusEl=document.getElementById('status'), app=document.getElementById('app');
 const tokenMatch=location.pathname.match(/^\/s\/([0-9a-f]{48})$/);
@@ -45,19 +46,32 @@ function renderCreatedSession(created){
 const siteTools=registerPptMasterSiteTools({onCreated:renderCreatedSession});
 
 function renderHostBridge(){
-  if(siteTools.available){
-    statusEl.innerHTML='<span class="ok">ChatGPT Site Tools 已就绪。</span> 保持此页面在 ChatGPT 桌面版内置 Browser 中打开，ChatGPT 即可创建/查询确认 session。';
-  }else{
-    statusEl.innerHTML='<span class="warn">当前浏览器没有暴露 WebMCP modelContext。</span> 普通浏览器仍可用于确认页面；Site Tools 需要在支持该能力的 ChatGPT 桌面版内置 Browser 中打开此根页。';
-  }
-  app.innerHTML=`<div class="card"><h2>Site Tools Host Bridge</h2><p>此根页不承载 Harness accepted 状态，只把 ChatGPT 的 Site Tools 调用桥接到同源 Durable Object API。</p><div>${['create_confirm_session','get_confirm_session','get_confirm_response'].map(x=>`<span class="pill">${x}</span>`).join('')}</div><p class="muted">正常流程：ChatGPT 创建 session → 页面显示确认链接 → 用户打开并确认 → ChatGPT 读取 response → ChatGPT Harness validate。</p><div id="created-session" class="card"><span class="muted">尚未创建 session。</span></div></div>`;
+  statusEl.innerHTML='<span class="ok">Browser Handoff 已就绪。</span> ChatGPT 可以生成一次性 bootstrap 链接；打开后页面会自动创建确认 session。';
+  const siteToolText=siteTools.available
+    ? '<span class="ok">Site Tools 也已被当前浏览器发现，可作为可选路径。</span>'
+    : '<span class="muted">当前浏览器未暴露 WebMCP modelContext；不影响 B4 Browser Handoff。</span>';
+  app.innerHTML=`<div class="card"><h2>Browser Handoff Bridge</h2><p>默认路径不要求模型获得 Site Tool function handle。Stage payload 放在 URL fragment 中，fragment 不会被发送给服务器；页面读取后会立即清掉 fragment，再同源创建 Durable Object session。</p><p>${siteToolText}</p><div>${['create_confirm_session','get_confirm_session','get_confirm_response'].map(x=>`<span class="pill">${x}</span>`).join('')}</div><p class="muted">B4 流程：ChatGPT 生成 bootstrap 链接 → 页面自动创建 session 并跳到确认页 → 用户确认 → 页面把 captured response 写入本地 URL fragment → 用户回聊天 → ChatGPT Harness validate。</p><div id="created-session" class="card"><span class="muted">尚未创建 session。</span></div></div>`;
+}
+
+async function runBootstrap(bootstrap){
+  history.replaceState(null,'',location.pathname+location.search);
+  statusEl.innerHTML='<span class="warn">正在从 Browser Handoff 创建确认 session…</span>';
+  app.innerHTML='<div class="card"><span class="muted">Bootstrap payload 已从地址栏 fragment 清除，正在写入同源 Durable Object。</span></div>';
+  const created=await api('/api/sessions',{method:'POST',body:JSON.stringify({surface:bootstrap.surface,payload:bootstrap.payload})});
+  statusEl.innerHTML='<span class="ok">Session 已创建，正在进入确认页面…</span>';
+  location.replace(created.path);
+}
+
+function renderCapturedHandoff(value){
+  statusEl.innerHTML='<span class="ok">已捕获；Browser Handoff 已准备好。</span> 请保持此页面打开并回到 ChatGPT。Harness 尚未 validate。';
+  app.innerHTML=`<div class="card"><h2>确认已捕获</h2><p>当前地址栏 fragment 携带一份本地 browser handoff，供 ChatGPT 在你回到聊天后接力读取。fragment 不会随 HTTP 请求发送给服务器。</p><div class="pill">${esc(value.surface)}</div><div class="pill">captured-not-validated</div><p class="muted">只有 ChatGPT 本地 Harness validator 生成 accepted receipt 后 Gate 才算通过。</p></div>`;
 }
 
 function renderStage1(s){
   const p=s.payload||{},rec=p.recommendation||{};
   const keys=['audience','communication_intent','audience_outcome','core_message','delivery_context','artifact_afterlife','content_divergence'];
   const labels={audience:'受众',communication_intent:'沟通意图',audience_outcome:'期望受众结果',core_message:'核心信息',delivery_context:'使用场景',artifact_afterlife:'材料后续用途',content_divergence:'内容处理'};
-  app.innerHTML=`<div class="card"><h2>Stage 1</h2><div class="grid">${keys.map(k=>field(k,labels[k],rec[k]||'')).join('')}</div><div class="grid"><div><label>主要语言</label><input id="primary_language" value="${esc(rec.primary_language||'zh-CN')}"></div><div><label>画布</label><input id="canvas" value="${esc((rec.recommend||{}).canvas||rec.canvas||'ppt169')}"></div></div><h3>模板</h3><span class="pill">POC：自由设计</span><div class="muted">B3P transport / Site Tools POC 暂不开放模板选择；完整 candidate schema 在 Host Bridge 验证通过后迁移。</div><p><button class="btn" id="submit">确认并捕获</button></p><pre id="out"></pre></div>`;
+  app.innerHTML=`<div class="card"><h2>Stage 1</h2><div class="grid">${keys.map(k=>field(k,labels[k],rec[k]||'')).join('')}</div><div class="grid"><div><label>主要语言</label><input id="primary_language" value="${esc(rec.primary_language||'zh-CN')}"></div><div><label>画布</label><input id="canvas" value="${esc((rec.recommend||{}).canvas||rec.canvas||'ppt169')}"></div></div><h3>模板</h3><span class="pill">POC：自由设计</span><div class="muted">B4 transport / Browser Handoff POC 暂不开放模板选择；完整 candidate schema 在 Host Bridge 验证通过后迁移。</div><p><button class="btn" id="submit">确认并捕获</button></p><pre id="out"></pre></div>`;
   document.getElementById('submit').onclick=async()=>{
     const btn=document.getElementById('submit');btn.disabled=true;
     const values={stage:'stage1',primary_language:document.getElementById('primary_language').value,canvas:document.getElementById('canvas').value,template_selection:{mode:'free_design',selection_keys:[]}};
@@ -66,7 +80,9 @@ function renderStage1(s){
     try{
       const ack=await api(`/api/sessions/${token}/response`,{method:'POST',body:JSON.stringify(response)});
       document.getElementById('out').textContent=JSON.stringify({ack,response},null,2);
-      statusEl.innerHTML='<span class="ok">已捕获；仍需返回 ChatGPT Harness validate。</span>';
+      const handoffHash=buildCaptureHash({session:token,surface:'stage1',response,captured_at:ack.captured_at});
+      history.replaceState(null,'',`${location.pathname}${handoffHash}`);
+      renderCapturedHandoff(decodeCaptureHash(handoffHash));
     }catch(e){btn.disabled=false;statusEl.innerHTML=`<span class="err">${esc(e.message)}</span>`}
   };
 }
@@ -74,8 +90,15 @@ function renderStage1(s){
 function renderGeneric(s){app.innerHTML=`<div class="card"><h2>${esc(s.surface)}</h2><p class="muted">此 POC 当前仅实现 Stage 1 表单；其余 surface 先验证 session 传输层。</p><pre>${esc(JSON.stringify(s.payload,null,2))}</pre></div>`}
 
 (async()=>{
-  if(!token){renderHostBridge();return;}
   try{
+    if(!token){
+      const bootstrap=decodeBootstrapHash(location.hash);
+      if(bootstrap){await runBootstrap(bootstrap);return;}
+      renderHostBridge();
+      return;
+    }
+    const captured=decodeCaptureHash(location.hash);
+    if(captured){renderCapturedHandoff(captured);return;}
     session=await api(`/api/sessions/${token}`);
     statusEl.textContent=`Session ${token.slice(0,10)}… · ${session.surface} · 到期 ${session.expires_at}`;
     session.surface==='stage1'?renderStage1(session):renderGeneric(session);
