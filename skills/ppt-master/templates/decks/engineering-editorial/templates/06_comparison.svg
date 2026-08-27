@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+ width="1280" height="720" viewBox="0 0 1280 720"
+ data-pptx-master="ee_content_master" data-pptx-master-name="Engineering Editorial Content"
+ data-pptx-layout="comparison" data-pptx-layout-name="Before / After Comparison">
+
+  <rect id="content-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false"/>
+  <circle id="content-dot" cx="62" cy="44" r="5" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false"/>
+  <line id="content-top-rule" x1="78" y1="44" x2="250" y2="44" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false"/>
+  <line id="content-footer-rule" x1="60" y1="676" x2="1220" y2="676" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false"/>
+
+  <rect id="compare-left-panel" x="60" y="170" width="510" height="414" rx="18" fill="#EDEFF2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <rect id="compare-right-panel" x="710" y="170" width="510" height="414" rx="18" fill="#FFFFFF" stroke="#246BCE" stroke-width="2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <line id="compare-center-line" x1="640" y1="210" x2="640" y2="545" stroke="#E38B2C" stroke-width="3" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <circle id="compare-center-dot" cx="640" cy="377" r="17" fill="#E38B2C" data-pptx-layer="layout" data-pptx-editable="false"/>
+
+  <g id="compare-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 72 1080 62">
+    <text id="compare-title-carrier" data-pptx-carrier="true" x="60" y="114"
+      fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="40" font-weight="700">{{BEFORE / AFTER OR TWO-PATH COMPARISON}}</text>
+  </g>
+  <g id="compare-left-label" data-pptx-placeholder="body" data-pptx-idx="1" data-pptx-bounds="88 194 430 36">
+    <text id="compare-left-label-carrier" data-pptx-carrier="true" x="88" y="220"
+      fill="#667482" font-family="Arial, Microsoft YaHei, sans-serif" font-size="17" font-weight="700">{{BEFORE / PATH A}}</text>
+  </g>
+  <g id="compare-left-slot" data-pptx-placeholder="object" data-pptx-idx="2" data-pptx-bounds="88 244 432 294">
+    <text id="compare-left-carrier" data-pptx-carrier="true" x="88" y="278"
+      fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="400">{{CURRENT PATH / FAILURE MODE}}</text>
+  </g>
+  <g id="compare-right-label" data-pptx-placeholder="body" data-pptx-idx="3" data-pptx-bounds="738 194 430 36">
+    <text id="compare-right-label-carrier" data-pptx-carrier="true" x="738" y="220"
+      fill="#246BCE" font-family="Arial, Microsoft YaHei, sans-serif" font-size="17" font-weight="700">{{AFTER / PATH B}}</text>
+  </g>
+  <g id="compare-right-slot" data-pptx-placeholder="object" data-pptx-idx="4" data-pptx-bounds="738 244 432 294">
+    <text id="compare-right-carrier" data-pptx-carrier="true" x="738" y="278"
+      fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="400">{{IMPROVED PATH / CONTROL}}</text>
+  </g>
+</svg>

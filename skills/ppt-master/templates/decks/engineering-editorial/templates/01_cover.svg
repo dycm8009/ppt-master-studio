@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ee_anchor_master" data-pptx-master-name="Engineering Editorial Anchor" data-pptx-layout="cover" data-pptx-layout-name="Engineering Editorial Cover">
+
+  <rect id="anchor-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false" />
+  <circle id="anchor-dot" cx="62" cy="46" r="6" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-top-rule" x1="82" y1="46" x2="238" y2="46" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-bottom-rule" x1="60" y1="674" x2="1220" y2="674" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false" />
+
+  <text id="cover-kicker" x="60" y="92" fill="#246BCE" font-family="Arial, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" data-pptx-layer="layout" data-pptx-editable="false">ENGINEERING EDITORIAL</text>
+  <rect id="cover-accent" x="60" y="137" width="76" height="7" rx="3.5" fill="#E38B2C" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="760" y1="190" x2="1140" y2="190" stroke="#D6DCE2" stroke-width="2" id="cover-system-visual-01" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="760" y1="270" x2="1140" y2="270" stroke="#D6DCE2" stroke-width="2" id="cover-system-visual-02" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="760" y1="350" x2="1140" y2="350" stroke="#D6DCE2" stroke-width="2" id="cover-system-visual-03" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="810" cy="190" r="14" fill="#246BCE" id="cover-system-visual-04" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="930" cy="270" r="14" fill="#E38B2C" id="cover-system-visual-05" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="1040" cy="190" r="14" fill="#667482" id="cover-system-visual-06" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="1140" cy="350" r="14" fill="#2F8F6B" id="cover-system-visual-07" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="810" y1="190" x2="930" y2="270" stroke="#17324D" stroke-width="2" id="cover-system-visual-08" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="930" y1="270" x2="1040" y2="190" stroke="#17324D" stroke-width="2" id="cover-system-visual-09" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="1040" y1="190" x2="1140" y2="350" stroke="#17324D" stroke-width="2" id="cover-system-visual-10" data-pptx-layer="layout" data-pptx-editable="false" />
+
+  <g id="cover-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 182 650 150">
+    <text id="cover-title-carrier" data-pptx-carrier="true" x="60" y="238" fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="52" font-weight="700">{{TITLE}}</text>
+  </g>
+  <g id="cover-subtitle-slot" data-pptx-placeholder="subtitle" data-pptx-idx="1" data-pptx-bounds="60 346 650 88">
+    <text id="cover-subtitle-carrier" data-pptx-carrier="true" x="60" y="391" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="27" font-weight="400">{{SUBTITLE}}</text>
+  </g>
+  <g id="cover-author-slot" data-pptx-placeholder="body" data-pptx-idx="2" data-pptx-bounds="60 542 620 56">
+    <text id="cover-author-carrier" data-pptx-carrier="true" x="60" y="578" fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="400">{{PRESENTER / TEAM}}</text>
+  </g>
+  <g id="cover-footer-slot" data-pptx-placeholder="footer" data-pptx-idx="3" data-pptx-bounds="60 618 900 32">
+    <text id="cover-footer-carrier" data-pptx-carrier="true" x="60" y="641" fill="#667482" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" font-weight="400">{{DATE · EVENT}}</text>
+  </g>
+</svg>
