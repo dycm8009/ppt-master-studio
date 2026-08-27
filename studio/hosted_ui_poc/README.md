@@ -1,77 +1,89 @@
-# Hosted Confirm UI POC（方案 B3）
+# Hosted Confirm UI POC（方案 B3P + B3E）
 
 这是隔离验证目录，不改变当前 `static-html` 生产路径。
 
-B2 已验证 Cloudflare Worker + Static Assets + per-session Durable Object 的 Hosted transport。B3 在同一个 Worker 上增加远程 MCP Host Adapter，使 ChatGPT 能直接创建确认 session、读取状态并取回用户 response；正常用户路径不依赖用户本机 `curl`、Python、Wrangler 或 repo checkout。
+B2 已验证 Cloudflare Worker + Static Assets + per-session Durable Object 的 Hosted transport。B3 现在分成两条 Host Adapter：
+
+- **B3P（默认，Plus）**：ChatGPT 桌面版内置 Browser + Site Tools / WebMCP。网页自己注册 3 个工具，直接调用同源 `/api/*`，不依赖自定义 MCP Connector。
+- **B3E（可选，Business / Enterprise / Edu）**：远程 `/mcp` endpoint，复用相同 Durable Object session 后端。
+
+正常用户路径不依赖用户本机 `curl`、Python、Wrangler 或 repo checkout。
 
 ## 目标架构
 
 ```text
-ChatGPT / PPT Master Harness
+ChatGPT Plus Desktop + Site Tools
         |
-        | remote MCP tools
+        | page-native WebMCP tools
         v
-/mcp  Host Adapter
+Hosted root page /   (Host Bridge)
         |
+        | same-origin /api/*
         v
 Durable Object session storage
         |
-        +---- /s/<token> ----> 用户浏览器确认
+        +---- /s/<token> ----> 用户确认
         |
-        +---- captured response ----> ChatGPT
+        +---- captured response ----> ChatGPT Site Tool
                                       |
                                       v
-                         local Harness validate
+                         ChatGPT-local Harness validate
+
+Optional B3E:
+ChatGPT Business/Enterprise -> /mcp -> same Durable Object backend
 ```
 
 Hosted service 仍然只负责 capture。它不能生成 `accepted.stage1.json`，也不能把 `captured-not-validated` 升格为 accepted；最终 authority 始终是 PPT Master Studio 本地 Harness validator。
 
-## B3 MCP endpoint
+## B3P：Plus Site Tools Host Bridge
 
-远程 MCP endpoint：
+在 ChatGPT 桌面版的内置 Browser 中打开 Worker 根页 `/`。根页检测 `document.modelContext || navigator.modelContext`，并注册恰好 3 个 Site Tools：
 
-`https://<worker>.<account>.workers.dev/mcp`
+- `create_confirm_session(surface, payload)`：写动作。创建 24h Hosted session，返回 `confirm_url`，并在根页显示可点击的确认链接。
+- `get_confirm_session(session)`：只读。返回 open/captured/expired 状态，不返回私有 payload。
+- `get_confirm_response(session)`：只读。用户尚未确认时返回 `pending`；确认后返回 captured response，并明确 `harness_status=not-validated`。
 
-使用 Cloudflare Agents SDK 当前推荐的 stateless `createMcpHandler()` 路径。MCP server 与现有 `/api/*`、`/s/<token>` 共享同一个 `SESSIONS` Durable Object binding。
+这 3 个工具是网页原生 WebMCP 工具，不需要 MCP App、Developer Mode 或 MCP Connector。根页应保持打开，因为 Site Tools 只属于提供它们的当前网页；确认页可以另开标签。
 
-暴露 3 个工具：
+### B3P 正常用户路径
 
-- `create_confirm_session(surface, payload)`：创建 24h Hosted session，返回 `confirm_url`；不会创建 accepted receipt。
-- `get_confirm_session(session)`：只读 session 状态，不返回私有 payload。
-- `get_confirm_response(session)`：用户尚未确认时返回 `pending`；确认后返回 captured response，并明确 `harness_status=not-validated`。
-
-MCP tools 不提供 `accept`、`validate`、`approve` 或任何能制造 Harness accepted receipt 的远端动作。
-
-## ChatGPT-native 正常用户路径
-
-1. ChatGPT 内的 PPT Master Harness 生成 Stage payload 和真实 hashes。
-2. ChatGPT 调用 `create_confirm_session`。
-3. ChatGPT 把返回的 `confirm_url` 给用户。
-4. 用户只在浏览器里确认，不需要打开终端。
-5. 用户回到 ChatGPT 后，ChatGPT 调用 `get_confirm_response`。
+1. 用户在 ChatGPT 桌面版内置 Browser 打开 Hosted 根页一次。
+2. PPT Master Harness 在 ChatGPT 中生成 Stage payload 和真实 hashes。
+3. ChatGPT 调用根页 Site Tool `create_confirm_session`。
+4. 根页显示确认链接；用户打开 `/s/<token>` 并点击“确认并捕获”。
+5. ChatGPT 调用 `get_confirm_response` 取回用户 response。
 6. ChatGPT 在自己的 Harness 运行环境中执行 `static_ui_adapter.py validate`。
 7. 只有 validator 生成 `static_ui/accepted.<surface>.json` 后 Gate 才算 accepted。
 
-`validate_stage1_gate.py` 仅保留为开发者 E2E / regression / disaster-debug 工具，不是生产用户流程。
+用户不需要终端、curl、Python、Wrangler 或本地 repo。
 
-## 在 ChatGPT 中连接 POC
+## B3E：可选 Remote MCP
 
-ChatGPT 需要支持远程自定义 MCP App 的 Developer Mode。创建一个自定义 App，endpoint 填部署后的 `/mcp` URL，然后 Scan Tools；扫描结果应恰好包含上面的 3 个工具。POC 当前不配置 OAuth，因此只适合隔离测试。正式上线前必须增加认证和访问控制。
+远程 MCP endpoint：`https://<worker>.<account>.workers.dev/mcp`。
 
-注意：`create_confirm_session` 属于写动作；实际可用性受当前 ChatGPT 套餐、workspace policy 和 Developer Mode 权限控制。若当前 workspace 只允许 read/fetch MCP，则 B3 的 create 工具不能完成端到端测试。
+它使用 Cloudflare Agents SDK `createMcpHandler()`，同样只暴露：
+
+- `create_confirm_session`
+- `get_confirm_session`
+- `get_confirm_response`
+
+B3E 只作为支持完整自定义 MCP 的套餐/工作空间兼容层，不是 Plus 默认路径。
+
+## Harness authority
+
+无论 B3P 还是 B3E，Host Adapter 都不提供 `accept`、`validate`、`approve` 或任何能制造 Harness accepted receipt 的远端动作。`validate_stage1_gate.py` 仅保留为开发者 E2E / regression / disaster-debug 工具，不是生产用户流程。
 
 ## Deploy / regression
 
-开发者部署一次即可：
+GitHub Studio Regression 会：
 
-```sh
-cd studio/hosted_ui_poc
-npm install
-npx wrangler deploy --dry-run
-npx wrangler deploy
-```
+- 运行 Studio smoke；
+- 运行 B2 Durable Object transport smoke；
+- 用 mock `modelContext` 验证 B3P 恰好注册 3 个 Site Tools、读写 annotations、create/status/pending/captured 行为，以及 Host Bridge 不泄漏 session payload；
+- 安装 B3E MCP dependencies；
+- 执行 Wrangler bundle dry-run。
 
-GitHub Studio Regression 会安装该目录依赖、继续运行 B2 transport smoke，并执行 Wrangler MCP bundle dry-run，避免 MCP import/config 破坏 Worker 打包。
+`.github/workflows/hosted-ui-poc-deploy.yml` 可在 `studio-dev` push 后自动部署 Cloudflare POC。仓库配置 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` 后即可让部署不再依赖开发者本机；缺失 secrets 时 workflow 安全跳过真实部署。
 
 ## B2 已验证
 
@@ -83,15 +95,17 @@ GitHub Studio Regression 会安装该目录依赖、继续运行 B2 transport sm
 - Hosted API 返回 `Cache-Control: no-store`。
 - Hosted capture ack 始终为 `captured-not-validated`。
 
-## B3 剩余 Gate
+## B3P 剩余 Gate
 
-- 部署含 `/mcp` 的新 Worker bundle。
-- ChatGPT Developer Mode 能成功 Scan Tools，并只发现 3 个预期动作。
-- 从 ChatGPT 内部真实调用 `create_confirm_session`，无需用户终端操作。
-- 用户浏览器确认后，从 ChatGPT 内部调用 `get_confirm_response` 取回结果。
+- 部署含根页 Site Tools Host Bridge 的新 Worker bundle。
+- 在 ChatGPT Plus 桌面版内置 Browser 中打开根页，地址栏确认 Site Tools 可发现。
+- Site Tools 列表恰好包含 3 个预期动作。
+- ChatGPT 从会话中调用 `create_confirm_session`，无需用户终端操作。
+- 用户只在确认页点击确认。
+- ChatGPT 调用 `get_confirm_response` 取回 captured response。
 - 使用真实 Stage 1 project payload 在 ChatGPT Harness 内生成 `accepted.stage1.json`。
 - 24h alarm / expiry 的线上长时行为。
 
 ## Production hardening
 
-POC 当前 MCP endpoint 未加认证。生产化前至少增加 OAuth/身份绑定、origin/auth policy、session payload size limit、rate limiting / abuse protection、observability、审计和大对象拆分策略；不得因为 MCP 接入而降低现有 Harness Gate 或 Recovery / project_state 约束。
+POC 当前 Hosted API / Site Tools / MCP endpoint 未加用户身份绑定。生产化前至少增加身份/授权策略、session payload size limit、rate limiting / abuse protection、observability、审计和大对象拆分策略；不得因为 Site Tools 或 MCP 接入而降低现有 Harness Gate、Recovery 或 `project_state` 约束。
