@@ -26,7 +26,7 @@ POC 前端只实现 Stage 1 的主要沟通字段，用来验证 Hosted transpor
 ## Deploy
 
 1. 确认 Wrangler v4 可用并已登录 Cloudflare：`npx wrangler --version`、`npx wrangler whoami`。
-2. 在本目录运行 `npx wrangler check`。
+2. 在本目录运行 `npx wrangler deploy --dry-run` 做配置/打包检查。
 3. 运行 `npx wrangler deploy`。首次部署会按 `wrangler.jsonc` 的 `v1` migration 创建 SQLite-backed `HostedSession` Durable Object class，不需要预建 KV namespace。
 4. 用真实 Stage 1 payload 做完整 Gate：创建 session → 浏览器打开 `/s/<token>` → capture → Host GET response → `static_ui_adapter.py validate` → 检查 `accepted.stage1.json`。
 
