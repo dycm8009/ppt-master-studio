@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import json, subprocess, sys, tempfile, zipfile
+import importlib, json, subprocess, sys, tempfile, zipfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -15,7 +15,9 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.2.1'
+    assert v['studio_version']=='3.2.2'
+    assert v['static_ui_revision']>=2
+    assert v['static_ui_history_limit']==4
     assert v['project_contract_version']=='3.2.0'
     assert v['host_bootstrap_revision']>=2
     assert v['runtime_release_tag_pattern']=='studio-runtime-{commit}'
@@ -31,6 +33,29 @@ def main():
     assert 'studio-runtime-<SHA>' in instructions and '普通 handoff/source ZIP' in instructions
     assert 'A brand-new project does **not** require a Recovery Bundle.' in bootstrap
     assert (ROOT/'.github/workflows/studio-runtime-release.yml').is_file()
+    static_rules=(ROOT/'studio/enforcement/PPT_MASTER_STATIC_UI_RULES.md').read_text(encoding='utf-8')
+    assert 'static_ui/latest.json' in static_rules and 'unique, versioned HTML filename' in static_rules
+    if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
+    adapter=importlib.import_module('studio.scripts.static_ui_adapter')
+    with tempfile.TemporaryDirectory() as ui_td:
+        ui_project=Path(ui_td); ui_out=ui_project/'static_ui'; ui_out.mkdir()
+        (ui_out/'confirm_stage1.html').write_text('legacy',encoding='utf-8')
+        counter={'n':0}
+        original_render=adapter._render_surface
+        try:
+            def fake_render(project,surface):
+                counter['n']+=1
+                return f'<html><body>revision {counter["n"]}</body></html>'
+            adapter._render_surface=fake_render
+            names=[adapter.write_surface(ui_project,'stage1').name for _ in range(6)]
+        finally:
+            adapter._render_surface=original_render
+        assert len(set(names))==6
+        assert not (ui_out/'confirm_stage1.html').exists()
+        assert len(list(ui_out.glob('confirm_stage1__*.html')))==4
+        latest=json.loads((ui_out/'latest.json').read_text(encoding='utf-8'))
+        assert latest['surfaces']['stage1']['file']==names[-1]
+        assert (ui_out/names[-1]).is_file()
     run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
     with tempfile.TemporaryDirectory() as td:
         base=Path(td); project=base/'project'
