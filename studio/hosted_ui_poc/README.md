@@ -32,6 +32,7 @@ POC 前端只实现 Stage 1 的主要沟通字段，用来验证 Hosted transpor
    `python studio/hosted_ui_poc/validate_stage1_gate.py --base-url https://<worker>.<account>.workers.dev`
    脚本会用当前 Harness 的真实 template library 计算 hashes、创建 session、验证 immediate read，打印浏览器 URL；用户点击“确认并捕获”后回到终端按 Enter，脚本会取回 response 并调用 `static_ui_adapter.py validate`，最终必须生成 `accepted.stage1.json`。
    如已有真实 Stage 1 项目，可追加 `--project <project-dir>`，要求其中存在 `confirm_ui/recommendations.stage1.json` 和 `confirm_ui/template_options.json`。
+   此 helper 只在本地运行，不改变 Worker；已经部署 B2 Worker 后无需因此重新 deploy。
 
 ## 真实部署已验证
 
