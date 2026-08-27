@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ee_anchor_master" data-pptx-master-name="Engineering Editorial Anchor" data-pptx-layout="section" data-pptx-layout-name="Section Header">
+
+  <rect id="anchor-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false" />
+  <circle id="anchor-dot" cx="62" cy="46" r="6" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-top-rule" x1="82" y1="46" x2="238" y2="46" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-bottom-rule" x1="60" y1="674" x2="1220" y2="674" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false" />
+
+  <text id="section-kicker" x="60" y="94" fill="#E38B2C" font-family="Arial, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" data-pptx-layer="layout" data-pptx-editable="false">SECTION</text>
+  <rect x="800" y="200" width="310" height="78" rx="18" fill="#FFFFFF" stroke="#D6DCE2" id="section-semantic-visual-01" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="840" cy="239" r="11" fill="#246BCE" id="section-semantic-visual-02" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="850" y1="239" x2="1070" y2="239" stroke="#D6DCE2" stroke-width="2" id="section-semantic-visual-03" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="840" y1="278" x2="760" y2="378" stroke="#17324D" stroke-width="2" id="section-semantic-visual-04" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="920" y1="278" x2="920" y2="378" stroke="#E38B2C" stroke-width="2" id="section-semantic-visual-05" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="1000" y1="278" x2="1080" y2="378" stroke="#17324D" stroke-width="2" id="section-semantic-visual-06" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="760" cy="390" r="24" fill="#EDEFF2" stroke="#246BCE" stroke-width="2" id="section-semantic-visual-07" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="920" cy="390" r="24" fill="#EDEFF2" stroke="#E38B2C" stroke-width="2" id="section-semantic-visual-08" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="1080" cy="390" r="24" fill="#EDEFF2" stroke="#2F8F6B" stroke-width="2" id="section-semantic-visual-09" data-pptx-layer="layout" data-pptx-editable="false" />
+  <g id="section-num-slot" data-pptx-placeholder="body" data-pptx-idx="1" data-pptx-bounds="60 132 150 40">
+    <text id="section-num-carrier" data-pptx-carrier="true" x="60" y="160" fill="#246BCE" font-family="Arial, Microsoft YaHei, sans-serif" font-size="17" font-weight="700">{{01 / 05}}</text>
+  </g>
+  <g id="section-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 210 650 120">
+    <text id="section-title-carrier" data-pptx-carrier="true" x="60" y="267" fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="48" font-weight="700">{{SECTION TITLE}}</text>
+  </g>
+  <g id="section-subtitle-slot" data-pptx-placeholder="subtitle" data-pptx-idx="2" data-pptx-bounds="60 350 620 96">
+    <text id="section-subtitle-carrier" data-pptx-carrier="true" x="60" y="392" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="400">{{ONE-SENTENCE SECTION TAKEAWAY}}</text>
+  </g>
+</svg>
