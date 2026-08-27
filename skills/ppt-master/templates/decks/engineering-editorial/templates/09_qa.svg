@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ee_anchor_master" data-pptx-master-name="Engineering Editorial Anchor" data-pptx-layout="qa" data-pptx-layout-name="Q&amp;A / Internal Discussion">
+
+  <rect id="anchor-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false" />
+  <circle id="anchor-dot" cx="62" cy="46" r="6" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-top-rule" x1="82" y1="46" x2="238" y2="46" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="anchor-bottom-rule" x1="60" y1="674" x2="1220" y2="674" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false" />
+
+  <rect x="60" y="278" width="260" height="168" rx="18" fill="#FFFFFF" stroke="#D6DCE2" id="qa-cards-01" data-pptx-layer="layout" data-pptx-editable="false" />
+  <rect x="350" y="278" width="260" height="168" rx="18" fill="#FFFFFF" stroke="#D6DCE2" id="qa-cards-02" data-pptx-layer="layout" data-pptx-editable="false" />
+  <rect x="640" y="278" width="260" height="168" rx="18" fill="#FFFFFF" stroke="#D6DCE2" id="qa-cards-03" data-pptx-layer="layout" data-pptx-editable="false" />
+  <rect x="930" y="278" width="290" height="168" rx="18" fill="#FFFFFF" stroke="#D6DCE2" id="qa-cards-04" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="92" cy="310" r="9" fill="#246BCE" id="qa-cards-05" data-pptx-layer="layout" data-pptx-editable="false" /><circle cx="382" cy="310" r="9" fill="#E38B2C" id="qa-cards-06" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="672" cy="310" r="9" fill="#17324D" id="qa-cards-07" data-pptx-layer="layout" data-pptx-editable="false" /><circle cx="962" cy="310" r="9" fill="#2F8F6B" id="qa-cards-08" data-pptx-layer="layout" data-pptx-editable="false" />
+  <g id="qa-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 92 1080 70">
+    <text id="qa-title-carrier" data-pptx-carrier="true" x="60" y="140" fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="48" font-weight="700">{{Q&amp;A · INTERNAL DISCUSSION}}</text>
+  </g>
+  <g id="qa-subtitle-slot" data-pptx-placeholder="subtitle" data-pptx-idx="1" data-pptx-bounds="60 174 1080 62">
+    <text id="qa-subtitle-carrier" data-pptx-carrier="true" x="60" y="212" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="24" font-weight="400">{{BRING ONE QUESTION YOU KEEP CORRECTING}}</text>
+  </g>
+  <g id="qa-1-slot" data-pptx-placeholder="body" data-pptx-idx="2" data-pptx-bounds="80 326 220 92">
+    <text id="qa-1-carrier" data-pptx-carrier="true" x="80" y="360" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="600">{{DISCUSSION PROMPT 1}}</text>
+  </g>
+  <g id="qa-2-slot" data-pptx-placeholder="body" data-pptx-idx="3" data-pptx-bounds="370 326 220 92">
+    <text id="qa-2-carrier" data-pptx-carrier="true" x="370" y="360" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="600">{{DISCUSSION PROMPT 2}}</text>
+  </g>
+  <g id="qa-3-slot" data-pptx-placeholder="body" data-pptx-idx="4" data-pptx-bounds="660 326 220 92">
+    <text id="qa-3-carrier" data-pptx-carrier="true" x="660" y="360" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="600">{{DISCUSSION PROMPT 3}}</text>
+  </g>
+  <g id="qa-4-slot" data-pptx-placeholder="body" data-pptx-idx="5" data-pptx-bounds="950 326 240 92">
+    <text id="qa-4-carrier" data-pptx-carrier="true" x="950" y="360" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="600">{{DISCUSSION PROMPT 4}}</text>
+  </g>
+  <g id="qa-footer-slot" data-pptx-placeholder="footer" data-pptx-idx="6" data-pptx-bounds="60 590 1120 50">
+    <text id="qa-footer-carrier" data-pptx-carrier="true" x="60" y="624" fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="400">{{THANK YOU / NEXT STEP}}</text>
+  </g>
+</svg>
