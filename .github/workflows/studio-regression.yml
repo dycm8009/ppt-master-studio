@@ -5,13 +5,9 @@ on:
     branches: [studio-dev, studio-main]
   pull_request:
     branches: [studio-main]
-    paths:
-      - 'studio/**'
-      - '.github/workflows/studio-regression.yml'
-      - 'skills/ppt-master/**'
 
 jobs:
-  overlay-smoke:
+  regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +18,7 @@ jobs:
         with:
           node-version: '20'
       - name: Compile Studio scripts
-        run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py
+        run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py studio/hosted_ui_poc/validate_stage1_gate.py
       - name: Load Static UI Adapter
         run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio smoke tests
