@@ -18,9 +18,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Compile Studio scripts
         run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py
       - name: Load Static UI Adapter
         run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio smoke tests
         run: python studio/tests/smoke_test.py
+      - name: Hosted UI POC transport smoke
+        run: node studio/hosted_ui_poc/test_hosted_ui.mjs
