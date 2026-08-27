@@ -28,14 +28,24 @@ POC 前端只实现 Stage 1 的主要沟通字段，用来验证 Hosted transpor
 1. 确认 Wrangler v4 可用并已登录 Cloudflare：`npx wrangler --version`、`npx wrangler whoami`。
 2. 在本目录运行 `npx wrangler deploy --dry-run` 做配置/打包检查。
 3. 运行 `npx wrangler deploy`。首次部署会按 `wrangler.jsonc` 的 `v1` migration 创建 SQLite-backed `HostedSession` Durable Object class，不需要预建 KV namespace。
-4. 用真实 Stage 1 payload 做完整 Gate：创建 session → 浏览器打开 `/s/<token>` → capture → Host GET response → `static_ui_adapter.py validate` → 检查 `accepted.stage1.json`。
+4. 用真实 Stage 1 payload 做完整 Gate。推荐从仓库根目录运行：
+   `python studio/hosted_ui_poc/validate_stage1_gate.py --base-url https://<worker>.<account>.workers.dev`
+   脚本会用当前 Harness 的真实 template library 计算 hashes、创建 session、验证 immediate read，打印浏览器 URL；用户点击“确认并捕获”后回到终端按 Enter，脚本会取回 response 并调用 `static_ui_adapter.py validate`，最终必须生成 `accepted.stage1.json`。
+   如已有真实 Stage 1 项目，可追加 `--project <project-dir>`，要求其中存在 `confirm_ui/recommendations.stage1.json` 和 `confirm_ui/template_options.json`。
 
-## 仍需在真实 Cloudflare 部署验证
+## 真实部署已验证
 
-- workers.dev / 自定义域名 URL 可达。
-- 创建后的 session 立即可读，capture 后 response 立即可读。
-- 24h alarm / expiry 行为符合预期。
-- Hosted service 始终只返回 `captured-not-validated`。
-- 实际 Stage 1 response 能被当前 Harness validator 接受。
+- workers.dev URL 可达。
+- Durable Object migration / binding 可正常创建 session。
+- 创建后的 session 可立即读取。
+- 浏览器 `/s/<token>` 可保持 token 路由并加载 Stage 1 UI。
+- 用户 capture 后 Host 可立即读取 response。
+- Hosted API 返回 `Cache-Control: no-store`。
+- Hosted capture ack 始终为 `captured-not-validated`。
+
+## 仍需完成
+
+- 使用真实项目 hashes 跑 `validate_stage1_gate.py`，确认本地 Harness 生成 `accepted.stage1.json`。
+- 24h alarm / expiry 的真实时间行为（代码路径已有自动测试；线上需保留为长时验证项）。
 
 生产化时建议继续增加 origin/auth、session payload size limit、Rate Limit / abuse protection、observability，以及大对象拆分策略。
