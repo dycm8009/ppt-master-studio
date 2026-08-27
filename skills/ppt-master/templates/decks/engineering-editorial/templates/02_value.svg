@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+ width="1280" height="720" viewBox="0 0 1280 720"
+ data-pptx-master="ee_content_master" data-pptx-master-name="Engineering Editorial Content"
+ data-pptx-layout="value" data-pptx-layout-name="Course Value / Why It Matters">
+
+  <rect id="content-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false"/>
+  <circle id="content-dot" cx="62" cy="44" r="5" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false"/>
+  <line id="content-top-rule" x1="78" y1="44" x2="250" y2="44" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false"/>
+  <line id="content-footer-rule" x1="60" y1="676" x2="1220" y2="676" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false"/>
+
+  <rect id="value-left-panel" x="60" y="150" width="530" height="458" rx="16" fill="#EDEFF2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <rect id="value-right-panel" x="620" y="150" width="600" height="458" rx="16" fill="#FFFFFF" stroke="#D6DCE2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <line id="value-mid-rule" x1="620" y1="246" x2="1220" y2="246" stroke="#D6DCE2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <line id="value-mid-rule2" x1="620" y1="352" x2="1220" y2="352" stroke="#D6DCE2" data-pptx-layer="layout" data-pptx-editable="false"/>
+  <line id="value-mid-rule3" x1="620" y1="458" x2="1220" y2="458" stroke="#D6DCE2" data-pptx-layer="layout" data-pptx-editable="false"/>
+
+  <g id="value-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 72 1080 62">
+    <text id="value-title-carrier" data-pptx-carrier="true" x="60" y="114"
+      fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="40" font-weight="700">{{WHY THIS MATTERS}}</text>
+  </g>
+  <g id="value-left-slot" data-pptx-placeholder="object" data-pptx-idx="1" data-pptx-bounds="88 184 466 380">
+    <text id="value-left-carrier" data-pptx-carrier="true" x="88" y="218"
+      fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="400">{{PROBLEM / AUDIENCE / IMPACT}}</text>
+  </g>
+  <g id="value-right-slot" data-pptx-placeholder="object" data-pptx-idx="2" data-pptx-bounds="650 178 540 392">
+    <text id="value-right-carrier" data-pptx-carrier="true" x="650" y="212"
+      fill="#246BCE" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="600">{{VALUE / OUTCOME / CAPABILITY}}</text>
+  </g>
+  <g id="value-footer-slot" data-pptx-placeholder="footer" data-pptx-idx="3" data-pptx-bounds="60 628 1120 30">
+    <text id="value-footer-carrier" data-pptx-carrier="true" x="60" y="649"
+      fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" font-weight="400">{{TARGET AUDIENCE}}</text>
+  </g>
+</svg>
