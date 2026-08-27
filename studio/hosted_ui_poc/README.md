@@ -1,135 +1,125 @@
-# Hosted Confirm UI POC（方案 B4 + B3P/B3E 兼容）
+# Hosted Confirm UI POC（方案 B4 + B3P/B3E compatibility）
 
 这是隔离验证目录，不改变当前 `static-html` 生产路径。
 
-B2 已验证 Cloudflare Worker + Static Assets + per-session Durable Object 的 Hosted transport。B3P 又证明 ChatGPT Plus 桌面版能发现网页注册的 3 个 Site Tools，但在当前宿主里“发现”没有自动等于“模型执行层可调用”。因此 Plus 默认路径升级为 **B4 Browser Handoff**；B3P Site Tools 与 B3E remote MCP 都保留为可选加速/兼容层。
+B2 已验证 Cloudflare Worker + Static Assets + per-session Durable Object 的 Hosted transport。Plus 默认路径现在是 **B4 Browser Handoff**；B3P Site Tools 与 B3E remote MCP 保留为兼容层。
 
-正常用户路径不依赖用户本机 `curl`、Python、Wrangler、repo checkout、Work mode 或自定义 MCP App。
+正常用户路径不依赖用户本机 `curl`、Python、Wrangler、repo checkout 或 Work mode。
 
-## B4 默认架构（Plus）
+## B4：Plus Browser Handoff（默认）
 
 ```text
 ChatGPT / PPT Master Harness
         |
-        | 生成 browser bootstrap URL
-        | payload 放在 #fragment（不随 HTTP 发送）
+        | Stage payload in URL #fragment
         v
 Hosted root page /
         |
-        | 读取 fragment -> 立即从地址栏清除
         | same-origin POST /api/sessions
         v
 Durable Object session storage
         |
-        +---- /s/<token> ----> 用户确认
+        +---- auto navigate /s/<token> ----> 用户确认
         |
-        +---- capture response
-                         |
-                         | response 编码进本地 #fragment
-                         v
-                  用户回到 ChatGPT
-                         |
-                         v
-                ChatGPT Harness validate
+        +---- capture succeeds
+        v
+/s/<token>#ppt-master-captured=<browser handoff>
+        |
+        | current Browser URL returns with the chat turn
+        v
+ChatGPT decodes response
+        |
+        v
+static_ui_adapter.py validate
+        |
+        v
+static_ui/accepted.<surface>.json
 ```
 
-Hosted service 仍然只负责 capture。它不能生成 `accepted.stage1.json`，也不能把 `captured-not-validated` 升格为 accepted；最终 authority 始终是 PPT Master Studio 本地 Harness validator。
+浏览器 `#fragment` 不会随 HTTP request 发送到 Worker。根页读取 bootstrap envelope 后立即用 `history.replaceState` 清掉 bootstrap fragment，再同源创建 session。确认成功后，页面把 capture envelope 写入当前 `/s/<token>` URL fragment，供 ChatGPT 内置 Browser 在用户返回聊天时完成 host handoff。
 
-## B4 Browser Handoff
+Hosted/browser 层始终只报告 `captured-not-validated` / `harness_status=not-validated`；只有本地 PPT Master Harness validator 能生成 accepted receipt。
 
-### Bootstrap
+POC 的 bootstrap/capture browser handoff envelope 上限为 24 KiB；超过上限必须显式失败，不得截断。
 
-ChatGPT 使用 Harness 生成的真实 surface payload 构造：
+## B4 real Plus/Desktop acceptance：PASS
 
-`https://<worker>.<account>.workers.dev/#ppt-master-bootstrap=<base64url-envelope>`
+已在真实 ChatGPT Plus 桌面版内置 Browser + 真实 Cloudflare Worker 完成两轮验证：
 
-Envelope schema：`ppt-master-browser-bootstrap/v1`。
+1. **Transport round-trip（dummy hashes）**
+   - ChatGPT 生成 bootstrap fragment URL；
+   - 页面自动创建 Durable Object session；
+   - 自动导航到 `/s/<token>`；
+   - 用户确认；
+   - 页面生成 `#ppt-master-captured=...`；
+   - 返回聊天后，ChatGPT 从当前 Browser URL 解码完整 response。
 
-关键边界：
+2. **Real Harness Stage 1 acceptance（real hashes）**
+   - 使用当前 Studio Harness 生成真实 Stage 1 recommendation/options hashes；
+   - 通过同一 B4 Browser Handoff 完成用户确认；
+   - ChatGPT 从当前 Browser URL 解码真实 `ppt-master-chat-confirm/v1` response；
+   - 在 ChatGPT 运行环境执行 `studio/scripts/static_ui_adapter.py validate`；
+   - validator 返回 0，并真实生成 `static_ui/accepted.stage1.json`；
+   - accepted receipt 的 recommendation/options hashes 与确认 payload 完全一致。
 
-- Stage payload 位于 URL fragment；浏览器不会把 fragment 作为 HTTP request target 发送给 Worker。
-- 根页解析后立即用 `history.replaceState` 清除 bootstrap fragment，再同源 `POST /api/sessions`。
-- 创建成功后页面自动 `location.replace('/s/<token>')`，用户直接进入确认页。
-- POC 对单个 browser handoff envelope 限制为 24 KiB，超限必须回到更强的 Host Adapter，而不是静默截断。
+本次真实 Stage 1 receipt hashes：
 
-### Capture handoff
+- `recommendation_sha256 = ca095617a96f74ba61737013c53de97353d18a4c71e9254779cb329149d6cbdc`
+- `options_sha256 = 5d55ae2b5a1fa2e6746868e0644b7bd119f1a3139f17f91827b304ed6e1f1692`
 
-用户点击“确认并捕获”后：
+因此 B4 已证明可以在 Plus 中完成：
 
-1. response 正常写入 Durable Object；ack 仍为 `captured-not-validated`。
-2. 页面额外生成 `ppt-master-browser-capture/v1` envelope。
-3. envelope 仅写入当前 `/s/<token>#ppt-master-captured=...` 的本地 fragment。
-4. 用户保持页面打开并回到 ChatGPT；ChatGPT 从当前 Browser URL 接力取得 response，然后在自己的 Harness 环境中执行 `static_ui_adapter.py validate`。
+`Harness payload -> Browser bootstrap -> user confirm -> Browser handoff -> Harness validate -> accepted receipt`
 
-Capture fragment 只是 POC host handoff，不是 accepted receipt。只有本地 validator 生成 `static_ui/accepted.<surface>.json` 后 Gate 才算 accepted。
+且不需要 Site Tool model invocation、Work mode、自定义 MCP App 或用户本机终端。
 
-## B3P：可选 Site Tools
+## B3P：Site Tools compatibility
 
-根页仍注册恰好 3 个 Site Tools：
+根页仍注册 3 个网页原生 Site Tools：
 
 - `create_confirm_session(surface, payload)`
 - `get_confirm_session(session)`
 - `get_confirm_response(session)`
 
-真实 ChatGPT Plus Desktop 已验证 Site Tools discovery：PASS（2 read + 1 write）。但当前宿主没有把这些网页工具稳定注入到模型可调用 tool set，所以 Site Tools 不再是 Plus 默认 acceptance path；如果未来宿主提供稳定 invocation，它可以无缝替代 B4 的 fragment handoff。
+真实 Plus Desktop 已证明 Site Tools discovery PASS（可见 2 个读取 + 1 个写入工具），但当前宿主没有稳定把 page tools 挂载到模型 execution tool set。因此 B3P 不再是 Plus acceptance dependency。
 
-## B3E：可选 Remote MCP
+## B3E：Remote MCP compatibility
 
 远程 MCP endpoint：`https://<worker>.<account>.workers.dev/mcp`。
 
-它继续暴露同样 3 个动作并复用相同 Durable Object 后端，只用于支持完整自定义 MCP 的套餐/工作空间，不是 Plus 默认路径。
+它复用相同 Durable Object 后端，仅作为支持自定义 remote MCP 的套餐/工作空间兼容层，不是 Plus 默认路径。
 
 ## Harness authority
 
-B4、B3P、B3E 都不提供 `accept`、`validate`、`approve` 或任何能制造 Harness accepted receipt 的远端动作。`validate_stage1_gate.py` 仅保留为开发者 E2E / regression / disaster-debug 工具，不是生产用户流程。
+Host Adapter、Hosted 页面、Site Tools 和 MCP 都不能提供 `accept`、`validate`、`approve` 或制造 Harness accepted receipt。最终 authority 始终是 PPT Master Studio 本地 Harness validator。
 
 ## Deploy / regression
 
-GitHub Studio Regression 会：
+GitHub Studio Regression 会覆盖：
 
-- 运行 Studio smoke；
-- 运行 B2 Durable Object transport smoke；
-- 验证 Site Tools 注册/读写 contract；
-- 验证 B4 bootstrap/capture fragment encode/decode contract；
-- 安装可选 B3E MCP dependencies；
-- 执行 Wrangler bundle dry-run。
+- Studio smoke；
+- B2 Durable Object transport smoke；
+- B3P mock Site Tools contract；
+- B4 bootstrap/capture fragment encode/decode contract；
+- Wrangler bundle dry-run（含可选 MCP endpoint）。
 
-`.github/workflows/hosted-ui-poc-deploy.yml` 在 `studio-dev` push 后自动部署 Cloudflare POC。仓库已配置 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` 后，部署不再依赖开发者本机。
+`.github/workflows/hosted-ui-poc-deploy.yml` 使用 GitHub Actions Secrets 中的 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` 自动部署 `studio-dev` 到 Cloudflare，不需要开发者本机 Wrangler。
 
 ## 已验证
 
-### B2 transport：PASS
+- workers.dev URL / Durable Object migration / binding；
+- create + immediate read-after-write；
+- `/s/<token>` route 保持 token；
+- capture -> immediate read；
+- API `Cache-Control: no-store`；
+- capture acknowledgement 始终 `captured-not-validated`；
+- Plus Desktop Site Tools discovery；
+- Plus Desktop B4 Browser Handoff；
+- 真实 Stage 1 Browser confirmation -> ChatGPT Harness accepted receipt。
 
-- workers.dev URL 可达。
-- Durable Object migration / binding 可正常创建 session。
-- 创建后的 session 可立即读取。
-- 浏览器 `/s/<token>` 可保持 token 路由并加载 Stage 1 UI。
-- 用户 capture 后 Host 可立即读取 response。
-- Hosted API 返回 `Cache-Control: no-store`。
-- Hosted capture ack 始终为 `captured-not-validated`。
+## 尚未关闭的验证项
 
-### B3P discovery：PASS
+- 24h Durable Object alarm / expiry 的真实长时线上行为仍是 long-running validation item。
+- 推进到 production 前仍需 identity/auth binding、rate limiting / abuse protection、payload limits、observability/audit，以及 browser fragment 的清理/隐私策略。
 
-- ChatGPT Plus 桌面版内置 Browser 能发现根页 Site Tools。
-- 列表恰好 3 个动作：2 read + 1 write。
-
-### B3P model invocation：当前宿主 BLOCKED
-
-- 即使在聊天中显式关联当前 Browser 页面，Site Tools 没有稳定出现在模型执行层可调用 tool set。
-- 因此不把这一步作为 Plus 默认 dependency。
-
-## B4 剩余 Gate
-
-Do not merge until：
-
-- 自动部署含 B4 Browser Handoff 的 Worker bundle；
-- ChatGPT 生成一个 Stage 1 bootstrap URL，用户只需在内置 Browser 打开；
-- 页面无需 Site Tool invocation 即自动创建 session 并进入 `/s/<token>`；
-- 用户点击确认后，当前 URL 出现 `#ppt-master-captured=...`；
-- 用户回聊天后，ChatGPT 能从 Browser URL 接力 decode captured response；
-- 使用真实 Stage 1 project payload 在 ChatGPT Harness 内生成 `accepted.stage1.json`；
-- 24h alarm / expiry 的线上长时行为。
-
-## Production hardening
-
-POC 当前 Hosted API / Site Tools / MCP endpoint 未加用户身份绑定。fragment 不会发送给服务器，但仍会存在于当前浏览器地址栏/本地 history 表面，因此 production 需要评估更严格的本地清除策略、身份/授权、session payload size limit、rate limiting / abuse protection、observability、审计以及大对象拆分策略；不得因为 Host Adapter 变化而降低 Harness Gate、Recovery 或 `project_state` 约束。
+在这些项目关闭前，PR 保持 Draft，不晋升到 `studio-main`。
