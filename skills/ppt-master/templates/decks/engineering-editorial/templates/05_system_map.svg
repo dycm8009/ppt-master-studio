@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ee_content_master" data-pptx-master-name="Engineering Editorial Content" data-pptx-layout="system-map" data-pptx-layout-name="System / Control Map">
+
+  <rect id="content-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false" />
+  <circle id="content-dot" cx="62" cy="44" r="5" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="content-top-rule" x1="78" y1="44" x2="250" y2="44" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="content-footer-rule" x1="60" y1="676" x2="1220" y2="676" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false" />
+
+  <rect id="map-canvas" x="60" y="160" width="1160" height="452" rx="18" fill="#FFFFFF" stroke="#D6DCE2" data-pptx-layer="layout" data-pptx-editable="false" />
+  <line x1="160" y1="388" x2="1100" y2="388" stroke="#D6DCE2" stroke-width="2" id="map-scaffold-01" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="210" cy="388" r="22" fill="#EDEFF2" stroke="#246BCE" stroke-width="2" id="map-scaffold-02" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="430" cy="388" r="22" fill="#EDEFF2" stroke="#246BCE" stroke-width="2" id="map-scaffold-03" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="650" cy="388" r="22" fill="#EDEFF2" stroke="#E38B2C" stroke-width="2" id="map-scaffold-04" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="870" cy="388" r="22" fill="#EDEFF2" stroke="#17324D" stroke-width="2" id="map-scaffold-05" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="1090" cy="388" r="22" fill="#EDEFF2" stroke="#2F8F6B" stroke-width="2" id="map-scaffold-06" data-pptx-layer="layout" data-pptx-editable="false" />
+  <g id="map-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 72 1080 62">
+    <text id="map-title-carrier" data-pptx-carrier="true" x="60" y="114" fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="40" font-weight="700">{{CONCLUSION-LED TITLE}}</text>
+  </g>
+  <g id="map-object-slot" data-pptx-placeholder="object" data-pptx-idx="1" data-pptx-bounds="100 192 1080 382">
+    <text id="map-object-carrier" data-pptx-carrier="true" x="100" y="226" fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" font-weight="400">{{SYSTEM MAP / ARCHITECTURE / CONTROL PLANE}}</text>
+  </g>
+  <g id="map-footer-slot" data-pptx-placeholder="footer" data-pptx-idx="2" data-pptx-bounds="60 628 1120 30">
+    <text id="map-footer-carrier" data-pptx-carrier="true" x="60" y="649" fill="#667482" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" font-weight="400">{{SOURCE / EVIDENCE NOTE}}</text>
+  </g>
+</svg>

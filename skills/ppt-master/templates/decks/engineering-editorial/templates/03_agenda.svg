@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ee_content_master" data-pptx-master-name="Engineering Editorial Content" data-pptx-layout="agenda" data-pptx-layout-name="Agenda">
+
+  <rect id="content-bg" x="0" y="0" width="1280" height="720" fill="#F7F6F2" data-pptx-layer="master" data-pptx-editable="false" />
+  <circle id="content-dot" cx="62" cy="44" r="5" fill="#246BCE" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="content-top-rule" x1="78" y1="44" x2="250" y2="44" stroke="#246BCE" stroke-width="2" data-pptx-layer="master" data-pptx-editable="false" />
+  <line id="content-footer-rule" x1="60" y1="676" x2="1220" y2="676" stroke="#D6DCE2" stroke-width="1" data-pptx-layer="master" data-pptx-editable="false" />
+
+  <line x1="142" y1="184" x2="142" y2="586" stroke="#D6DCE2" stroke-width="2" id="agenda-rail-01" data-pptx-layer="layout" data-pptx-editable="false" />
+  <circle cx="142" cy="190" r="15" fill="#246BCE" id="agenda-rail-02" data-pptx-layer="layout" data-pptx-editable="false" /><text x="142" y="196" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" id="agenda-rail-03" data-pptx-layer="layout" data-pptx-editable="false">01</text>
+  <circle cx="142" cy="282" r="15" fill="#246BCE" id="agenda-rail-04" data-pptx-layer="layout" data-pptx-editable="false" /><text x="142" y="288" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" id="agenda-rail-05" data-pptx-layer="layout" data-pptx-editable="false">02</text>
+  <circle cx="142" cy="374" r="15" fill="#E38B2C" id="agenda-rail-06" data-pptx-layer="layout" data-pptx-editable="false" /><text x="142" y="380" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" id="agenda-rail-07" data-pptx-layer="layout" data-pptx-editable="false">03</text>
+  <circle cx="142" cy="466" r="15" fill="#667482" id="agenda-rail-08" data-pptx-layer="layout" data-pptx-editable="false" /><text x="142" y="472" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" id="agenda-rail-09" data-pptx-layer="layout" data-pptx-editable="false">04</text>
+  <circle cx="142" cy="558" r="15" fill="#667482" id="agenda-rail-10" data-pptx-layer="layout" data-pptx-editable="false" /><text x="142" y="564" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" id="agenda-rail-11" data-pptx-layer="layout" data-pptx-editable="false">05</text>
+  <g id="agenda-title-slot" data-pptx-placeholder="title" data-pptx-bounds="60 72 1080 62">
+    <text id="agenda-title-carrier" data-pptx-carrier="true" x="60" y="114" fill="#17324D" font-family="Microsoft YaHei, Arial, sans-serif" font-size="40" font-weight="700">{{AGENDA}}</text>
+  </g>
+  <g id="agenda-item-1" data-pptx-placeholder="body" data-pptx-idx="1" data-pptx-bounds="190 174 930 56">
+    <text id="agenda-item-1-carrier" data-pptx-carrier="true" x="190" y="211" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="600">{{SECTION 1}}</text>
+  </g>
+  <g id="agenda-item-2" data-pptx-placeholder="body" data-pptx-idx="2" data-pptx-bounds="190 266 930 56">
+    <text id="agenda-item-2-carrier" data-pptx-carrier="true" x="190" y="303" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="600">{{SECTION 2}}</text>
+  </g>
+  <g id="agenda-item-3" data-pptx-placeholder="body" data-pptx-idx="3" data-pptx-bounds="190 358 930 56">
+    <text id="agenda-item-3-carrier" data-pptx-carrier="true" x="190" y="395" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="600">{{SECTION 3}}</text>
+  </g>
+  <g id="agenda-item-4" data-pptx-placeholder="body" data-pptx-idx="4" data-pptx-bounds="190 450 930 56">
+    <text id="agenda-item-4-carrier" data-pptx-carrier="true" x="190" y="487" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="600">{{SECTION 4}}</text>
+  </g>
+  <g id="agenda-item-5" data-pptx-placeholder="body" data-pptx-idx="5" data-pptx-bounds="190 542 930 56">
+    <text id="agenda-item-5-carrier" data-pptx-carrier="true" x="190" y="579" fill="#1E2732" font-family="Microsoft YaHei, Arial, sans-serif" font-size="25" font-weight="600">{{SECTION 5}}</text>
+  </g>
+</svg>
