@@ -34,13 +34,14 @@ Upstream mirror branch: main
 【ChatGPT 静态交互】
 15. Default Generate 的用户决策闭环使用 Studio Static UI Adapter：Stage 1（Communication + Template）→ Stage 2（Final Deck Plan）→ Deck Review；Custom Motion 被激活时增加 Motion Review。HTML 仅做本地交互并输出 JSON，用户回传后必须用 static_ui_adapter.py validate 生成 accepted receipt，不能凭聊天文字假定 Gate 已通过。
 16. Stage 1/2 固定 UI 随用户语言本地化；canonical IDs/enum 保持官方值。Stage 2 三套方向必须提供整页视觉样本；Visual Style、Mode、Icons、Image Strategy 必须提供各自适合的视觉/语义反馈，不能退化为仅文字+色板。
+17. Static UI HTML 必须使用 Adapter 返回的唯一版本化文件名（UTC 时间戳 + 内容 digest），不得复用或重新提供 `confirm_stage1.html`、`confirm_stage2.html`、`deck_review.html`、`motion_review.html` 这类固定名。每次 rebuild 后以 `static_ui/latest.json` 为当前页面指针，并把本次 build 返回的新路径发给用户；不要让用户继续打开聊天历史中的旧 HTML。
 
 【长 Deck / 图片 / 动画 / QA】
-17. 18 页及以上执行 Studio Deck-level Art Direction：Deck Rhythm、Composition Diversity、Primary Visual Carrier、Section Personality、Similarity Gate；默认同一构图连续不超过 2 页，禁止“标题+卡片”万能回退。
-18. 图片依次经过 Image Opportunity → Semantic Necessity → Template Compatibility → Image Role Fitness → Treatment & Placement；图片不是多样性配额，0 张图片合法。General + Dark Tech 默认 SVG-native，禁止 ambient/full-bleed raster/AI 背景和 dense HUD 概念图，除非真实证据型图片确有必要并放在明确内容容器中。
-19. 长 Deck 禁止 deck-wide auto animation；默认 transition none，章节边界可克制 fade；对象动画只服务讲解顺序并受 Motion Budget。Breathing/Anchor 页面默认静态。
-20. 最终导出前完成官方 SVG Quality Gate，并按 Studio 策略完成 Render Review、Deck Diversity/Similarity Audit、图片兼容性审计（如有）、Motion Audit（如有）、PPTX Postflight。Beautify/Convert 默认保持原始内容、事实与页序，除非用户明确授权改写。
+18. 18 页及以上执行 Studio Deck-level Art Direction：Deck Rhythm、Composition Diversity、Primary Visual Carrier、Section Personality、Similarity Gate；默认同一构图连续不超过 2 页，禁止“标题+卡片”万能回退。
+19. 图片依次经过 Image Opportunity → Semantic Necessity → Template Compatibility → Image Role Fitness → Treatment & Placement；图片不是多样性配额，0 张图片合法。General + Dark Tech 默认 SVG-native，禁止 ambient/full-bleed raster/AI 背景和 dense HUD 概念图，除非真实证据型图片确有必要并放在明确内容容器中。
+20. 长 Deck 禁止 deck-wide auto animation；默认 transition none，章节边界可克制 fade；对象动画只服务讲解顺序并受 Motion Budget。Breathing/Anchor 页面默认静态。
+21. 最终导出前完成官方 SVG Quality Gate，并按 Studio 策略完成 Render Review、Deck Diversity/Similarity Audit、图片兼容性审计（如有）、Motion Audit（如有）、PPTX Postflight。Beautify/Convert 默认保持原始内容、事实与页序，除非用户明确授权改写。
 
 【GitHub 分支纪律】
-21. main 保持 upstream 镜像；studio-main 只放通过回归的稳定 Studio Overlay；studio-dev 用于修改和测试。普通 PPT 永远不使用 studio-dev，除非用户明确要求测试开发版。
-22. Studio 修改先进入 studio-dev，GitHub Actions regression 通过后用 PR 晋升到 studio-main。手工上传 ZIP 不再是源码 authority；Runtime Artifact/Release 由 GitHub 自动生成并与稳定 commit SHA 绑定。
+22. main 保持 upstream 镜像；studio-main 只放通过回归的稳定 Studio Overlay；studio-dev 用于修改和测试。普通 PPT 永远不使用 studio-dev，除非用户明确要求测试开发版。
+23. Studio 修改先进入 studio-dev，GitHub Actions regression 通过后用 PR 晋升到 studio-main。手工上传 ZIP 不再是源码 authority；Runtime Artifact/Release 由 GitHub 自动生成并与稳定 commit SHA 绑定。
