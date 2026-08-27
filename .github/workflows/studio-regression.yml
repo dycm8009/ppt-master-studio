@@ -27,5 +27,11 @@ jobs:
         run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio smoke tests
         run: python studio/tests/smoke_test.py
+      - name: Install Hosted UI POC dependencies
+        working-directory: studio/hosted_ui_poc
+        run: npm install --no-audit --no-fund
       - name: Hosted UI POC transport smoke
         run: node studio/hosted_ui_poc/test_hosted_ui.mjs
+      - name: Hosted UI POC MCP bundle dry-run
+        working-directory: studio/hosted_ui_poc
+        run: npx wrangler deploy --dry-run

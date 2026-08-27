@@ -1,40 +1,79 @@
-# Hosted Confirm UI POC (方案 B2)
+# Hosted Confirm UI POC（方案 B3）
 
 这是隔离验证目录，不改变当前 `static-html` 生产路径。
 
-目标：验证 Cloudflare Worker + Static Assets + per-session Durable Object 是否能替代本地单文件 HTML，提供稳定 URL、强一致临时会话和更好的浏览器交互，同时保持 Harness validator 为最终 authority。
+B2 已验证 Cloudflare Worker + Static Assets + per-session Durable Object 的 Hosted transport。B3 在同一个 Worker 上增加远程 MCP Host Adapter，使 ChatGPT 能直接创建确认 session、读取状态并取回用户 response；正常用户路径不依赖用户本机 `curl`、Python、Wrangler 或 repo checkout。
 
-## 为什么从 KV 改为 Durable Object
+## 目标架构
 
-Hosted confirmation 是典型的即时 read-after-write 流程：Host 创建 session 后浏览器应立即读取，用户提交后 Host 也应立即取回 response。KV 的跨 location eventual consistency 不适合这个交互闭环；B2 使用 `SESSIONS.getByName(token)` 将每个随机 token 路由到独立 Durable Object，并在对象的 strongly-consistent storage 内保存该 session。
+```text
+ChatGPT / PPT Master Harness
+        |
+        | remote MCP tools
+        v
+/mcp  Host Adapter
+        |
+        v
+Durable Object session storage
+        |
+        +---- /s/<token> ----> 用户浏览器确认
+        |
+        +---- captured response ----> ChatGPT
+                                      |
+                                      v
+                         local Harness validate
+```
 
-## POC contract
+Hosted service 仍然只负责 capture。它不能生成 `accepted.stage1.json`，也不能把 `captured-not-validated` 升格为 accepted；最终 authority 始终是 PPT Master Studio 本地 Harness validator。
 
-- `POST /api/sessions`：创建 24h session。输入 `{surface,payload}`。
-- `GET /api/sessions/<token>`：读取 session。
-- `POST /api/sessions/<token>/response`：捕获一次用户确认 JSON；返回 `captured-not-validated`，绝不生成 accepted receipt。重复 capture 返回 409，避免覆盖已确认响应。
-- `GET /api/sessions/<token>/response`：由 Harness/host 取回用户回传，再调用现有 `static_ui_adapter.py validate`。
-- `/s/<token>`：浏览器交互页。
-- session token 为随机 192-bit bearer token；token 作为 Durable Object name，不存在可枚举的 session index；HTTP 响应使用 `Cache-Control: no-store`。
-- 每个 session 设置 24h Durable Object alarm；过期读取也会立即清空 storage，因此 alarm 延迟不会延长有效期。
-- PPT 内容和 session 数据只进入临时 Durable Object storage，不进入 GitHub。
+## B3 MCP endpoint
 
-## 当前范围
+远程 MCP endpoint：
 
-POC 前端只实现 Stage 1 的主要沟通字段，用来验证 Hosted transport + UX。为确保回传一定满足当前 Harness validator，本阶段固定 `template_selection.mode=free_design` 且 `selection_keys=[]`，暂不暴露模板选择 UI。Stage 2 / Deck Review / Motion Review 暂时只验证 session 传输层；在 POC 通过后再迁移现有 Static UI 组件和 Stage 1 candidate schema。
+`https://<worker>.<account>.workers.dev/mcp`
 
-## Deploy
+使用 Cloudflare Agents SDK 当前推荐的 stateless `createMcpHandler()` 路径。MCP server 与现有 `/api/*`、`/s/<token>` 共享同一个 `SESSIONS` Durable Object binding。
 
-1. 确认 Wrangler v4 可用并已登录 Cloudflare：`npx wrangler --version`、`npx wrangler whoami`。
-2. 在本目录运行 `npx wrangler deploy --dry-run` 做配置/打包检查。
-3. 运行 `npx wrangler deploy`。首次部署会按 `wrangler.jsonc` 的 `v1` migration 创建 SQLite-backed `HostedSession` Durable Object class，不需要预建 KV namespace。
-4. 用真实 Stage 1 payload 做完整 Gate。推荐从仓库根目录运行：
-   `python studio/hosted_ui_poc/validate_stage1_gate.py --base-url https://<worker>.<account>.workers.dev`
-   脚本会用当前 Harness 的真实 template library 计算 hashes、创建 session、验证 immediate read，打印浏览器 URL；用户点击“确认并捕获”后回到终端按 Enter，脚本会取回 response 并调用 `static_ui_adapter.py validate`，最终必须生成 `accepted.stage1.json`。
-   如已有真实 Stage 1 项目，可追加 `--project <project-dir>`，要求其中存在 `confirm_ui/recommendations.stage1.json` 和 `confirm_ui/template_options.json`。
-   此 helper 只在本地运行，不改变 Worker；已经部署 B2 Worker 后无需因此重新 deploy。
+暴露 3 个工具：
 
-## 真实部署已验证
+- `create_confirm_session(surface, payload)`：创建 24h Hosted session，返回 `confirm_url`；不会创建 accepted receipt。
+- `get_confirm_session(session)`：只读 session 状态，不返回私有 payload。
+- `get_confirm_response(session)`：用户尚未确认时返回 `pending`；确认后返回 captured response，并明确 `harness_status=not-validated`。
+
+MCP tools 不提供 `accept`、`validate`、`approve` 或任何能制造 Harness accepted receipt 的远端动作。
+
+## ChatGPT-native 正常用户路径
+
+1. ChatGPT 内的 PPT Master Harness 生成 Stage payload 和真实 hashes。
+2. ChatGPT 调用 `create_confirm_session`。
+3. ChatGPT 把返回的 `confirm_url` 给用户。
+4. 用户只在浏览器里确认，不需要打开终端。
+5. 用户回到 ChatGPT 后，ChatGPT 调用 `get_confirm_response`。
+6. ChatGPT 在自己的 Harness 运行环境中执行 `static_ui_adapter.py validate`。
+7. 只有 validator 生成 `static_ui/accepted.<surface>.json` 后 Gate 才算 accepted。
+
+`validate_stage1_gate.py` 仅保留为开发者 E2E / regression / disaster-debug 工具，不是生产用户流程。
+
+## 在 ChatGPT 中连接 POC
+
+ChatGPT 需要支持远程自定义 MCP App 的 Developer Mode。创建一个自定义 App，endpoint 填部署后的 `/mcp` URL，然后 Scan Tools；扫描结果应恰好包含上面的 3 个工具。POC 当前不配置 OAuth，因此只适合隔离测试。正式上线前必须增加认证和访问控制。
+
+注意：`create_confirm_session` 属于写动作；实际可用性受当前 ChatGPT 套餐、workspace policy 和 Developer Mode 权限控制。若当前 workspace 只允许 read/fetch MCP，则 B3 的 create 工具不能完成端到端测试。
+
+## Deploy / regression
+
+开发者部署一次即可：
+
+```sh
+cd studio/hosted_ui_poc
+npm install
+npx wrangler deploy --dry-run
+npx wrangler deploy
+```
+
+GitHub Studio Regression 会安装该目录依赖、继续运行 B2 transport smoke，并执行 Wrangler MCP bundle dry-run，避免 MCP import/config 破坏 Worker 打包。
+
+## B2 已验证
 
 - workers.dev URL 可达。
 - Durable Object migration / binding 可正常创建 session。
@@ -44,9 +83,15 @@ POC 前端只实现 Stage 1 的主要沟通字段，用来验证 Hosted transpor
 - Hosted API 返回 `Cache-Control: no-store`。
 - Hosted capture ack 始终为 `captured-not-validated`。
 
-## 仍需完成
+## B3 剩余 Gate
 
-- 使用真实项目 hashes 跑 `validate_stage1_gate.py`，确认本地 Harness 生成 `accepted.stage1.json`。
-- 24h alarm / expiry 的真实时间行为（代码路径已有自动测试；线上需保留为长时验证项）。
+- 部署含 `/mcp` 的新 Worker bundle。
+- ChatGPT Developer Mode 能成功 Scan Tools，并只发现 3 个预期动作。
+- 从 ChatGPT 内部真实调用 `create_confirm_session`，无需用户终端操作。
+- 用户浏览器确认后，从 ChatGPT 内部调用 `get_confirm_response` 取回结果。
+- 使用真实 Stage 1 project payload 在 ChatGPT Harness 内生成 `accepted.stage1.json`。
+- 24h alarm / expiry 的线上长时行为。
 
-生产化时建议继续增加 origin/auth、session payload size limit、Rate Limit / abuse protection、observability，以及大对象拆分策略。
+## Production hardening
+
+POC 当前 MCP endpoint 未加认证。生产化前至少增加 OAuth/身份绑定、origin/auth policy、session payload size limit、rate limiting / abuse protection、observability、审计和大对象拆分策略；不得因为 MCP 接入而降低现有 Harness Gate 或 Recovery / project_state 约束。
