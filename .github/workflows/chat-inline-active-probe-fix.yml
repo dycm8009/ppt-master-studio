@@ -1,0 +1,35 @@
+name: Chat Inline Active Probe Fix
+
+on:
+  push:
+    branches:
+      - fix/chat-inline-artifact-active-probe
+    paths:
+      - 'studio/artifact_ui_poc/**'
+      - 'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md'
+      - 'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt'
+      - '.github/workflows/studio-regression.yml'
+      - '.github/workflows/chat-inline-active-probe-fix.yml'
+
+jobs:
+  active-probe-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile artifact adapter
+        run: python -m compileall studio/artifact_ui_poc
+      - name: Existing artifact authority/parity suite
+        run: |
+          python -m studio.artifact_ui_poc.test_contract
+          python -m studio.artifact_ui_poc.test_handoff
+          python -m studio.artifact_ui_poc.test_adapter
+          python -m studio.artifact_ui_poc.test_project_models
+          python -m studio.artifact_ui_poc.test_renderer
+          python -m studio.artifact_ui_poc.test_stage2_parity
+          python -m studio.artifact_ui_poc.test_motion_parity
+          python -m studio.artifact_ui_poc.test_package
+      - name: New-chat active probe contract
+        run: python -m studio.artifact_ui_poc.test_render_contract
