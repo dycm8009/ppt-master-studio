@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import hashlib
 import json
 import mimetypes
 import os
@@ -37,6 +36,10 @@ from urllib.request import Request, urlopen
 STATE_NAME = "hosted_editor.json"
 LOCK_NAME = "lock.json"
 DEFAULT_TIMEOUT = 30
+HOST_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+)
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -51,7 +54,11 @@ def _request_json(
     headers: dict[str, str] | None = None,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> Any:
-    request_headers = {"Accept": "application/json", **(headers or {})}
+    request_headers = {
+        "Accept": "application/json",
+        "User-Agent": HOST_USER_AGENT,
+        **(headers or {}),
+    }
     data = None
     if body is not None:
         data = _json_bytes(body)
