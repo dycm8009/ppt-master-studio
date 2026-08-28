@@ -7,7 +7,7 @@
     "test:contract": "node test_official_confirm_ui_contract.mjs && node test_official_svg_editor_contract.mjs && node test_production_contract.mjs",
     "test": "npm run build && npm run test:contract && node test_hosted_official.mjs && node test_hosted_editor.mjs",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:production": "npm run build && wrangler deploy --config wrangler.production.jsonc"
+    "deploy:production": "npm run build && wrangler deploy --config wrangler.prod.jsonc"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.8.10"
