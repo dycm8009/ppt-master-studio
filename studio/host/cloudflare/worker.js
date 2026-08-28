@@ -5,8 +5,14 @@ import {
   validToken,
   reply,
 } from './core.js';
+import {
+  ACCEPTANCE_STAGE2_SESSION,
+  ACCEPTANCE_STAGE2_HOST_KEY,
+  ACCEPTANCE_STAGE2_SNAPSHOT,
+} from './acceptance_stage2.js';
 
 const COOKIE_NAME = 'ppt_master_session';
+const ACCEPTANCE_STAGE2_PATH = '/accept/stage2';
 
 function cookieToken(request) {
   const raw = request.headers.get('cookie') || '';
@@ -161,10 +167,27 @@ async function serveSessionPage(request, env, token) {
   return new Response(response.body, { status: response.status, headers });
 }
 
+async function handleAcceptanceStage2(request, env) {
+  if (request.method !== 'GET') return reply({ error: 'method not allowed' }, 405);
+  const stub = await sessionStub(env, ACCEPTANCE_STAGE2_SESSION);
+  const result = await stub.advance(ACCEPTANCE_STAGE2_HOST_KEY, ACCEPTANCE_STAGE2_SNAPSHOT);
+  if (!result?.ok) {
+    const current = await stub.get();
+    if (!current?.ok || current.record?.active_stage !== 'stage2') {
+      return reply({ error: result?.error || 'Stage 2 acceptance advance failed' }, result?.status || 400);
+    }
+  }
+  return Response.redirect(new URL(`/s/${ACCEPTANCE_STAGE2_SESSION}`, request.url), 302);
+}
+
 export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
+
+      if (url.pathname === ACCEPTANCE_STAGE2_PATH) {
+        return handleAcceptanceStage2(request, env);
+      }
 
       const hostApi = await handleHostSessionApi(request, env, url);
       if (hostApi) return hostApi;
