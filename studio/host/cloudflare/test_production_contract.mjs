@@ -40,13 +40,16 @@ if (!editorCore.includes("status: 'captured-not-applied'") || !editorCore.includ
 }
 if (!core.includes('async closeHost(hostKey')) throw new Error('Confirm host close is not authenticated');
 
-if (!prod.includes('"name": "ppt-master-hosted-confirm"')) throw new Error('production Worker name mismatch');
+if (!prod.includes('"name": "ppt-master-hosted-confirm"')) throw new Error('production alias Worker name mismatch');
 if (!prod.includes('"main": "worker_production.js"')) throw new Error('production config does not use clean Worker');
 if (!prod.includes('"/e/*"') || !prod.includes('"/images/*"')) throw new Error('production run_worker_first misses editor routes');
 if (prod.includes('"/accept/*"')) throw new Error('production config exposes acceptance routes');
 
-if (config.schema !== 'ppt-master-studio-hosted-ui-config/v1') throw new Error('Hosted UI config schema mismatch');
-if (config.production_base !== 'https://ppt-master-hosted-confirm.dycm-lab.workers.dev') throw new Error('production base mismatch');
+if (config.schema !== 'ppt-master-studio-hosted-ui-config/v2') throw new Error('Hosted UI config schema mismatch');
+if (config.production_base !== 'https://ppt-master-hosted-confirm.dycm-lab.workers.dev') throw new Error('production alias mismatch');
+if (config.immutable_base_pattern !== 'https://ppt-master-hosted-{commit12}.dycm-lab.workers.dev') throw new Error('immutable base pattern mismatch');
+if (config.immutable_worker_name_pattern !== 'ppt-master-hosted-{commit12}') throw new Error('immutable Worker naming mismatch');
+if (!String(config.pinned_asset_policy || '').includes('pinned 40-hex Harness commit')) throw new Error('pinned asset policy missing');
 if (config.authority.confirm !== 'local-pinned-official-confirm-ui') throw new Error('Confirm authority moved remote');
 if (config.authority.svg_editor !== 'local-pinned-official-svg-editor') throw new Error('SVG Editor authority moved remote');
 if (config.motion_review_surface !== false) throw new Error('Motion Review surface must remain disabled');
