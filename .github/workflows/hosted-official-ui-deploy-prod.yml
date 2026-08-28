@@ -48,7 +48,7 @@ jobs:
           node test_hosted_official.mjs
           node test_hosted_editor.mjs
           python test_confirm_handoff.py
-          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_runtime_roundtrip.py
+          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_confirm_runtime_roundtrip.py test_runtime_roundtrip.py
           npx wrangler deploy --dry-run --config wrangler.prod.jsonc
       - name: Deploy immutable commit-bound Hosted UI
         uses: cloudflare/wrangler-action@v4
@@ -71,7 +71,13 @@ jobs:
       - name: Validate pinned Confirm UI authority replay
         working-directory: studio/host/cloudflare
         run: python test_confirm_authority.py
-      - name: Validate immutable production Runtime round-trip
+      - name: Validate immutable production Confirm Runtime round-trip
+        working-directory: studio/host/cloudflare
+        env:
+          PPT_MASTER_HOSTED_DEV_BASE: ${{ steps.release.outputs.url }}
+          PPT_MASTER_HARNESS_COMMIT: ${{ github.sha }}
+        run: python test_confirm_runtime_roundtrip.py
+      - name: Validate immutable production SVG Editor Runtime round-trip
         working-directory: studio/host/cloudflare
         env:
           PPT_MASTER_HOSTED_DEV_BASE: ${{ steps.release.outputs.url }}
