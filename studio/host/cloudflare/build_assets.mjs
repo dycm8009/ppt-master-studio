@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const root = process.cwd();
-const hostDir = path.join(root, 'studio/host/cloudflare');
+const hostDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(hostDir, '../../..');
 const dist = path.join(hostDir, 'dist');
 const publicDir = path.join(hostDir, 'public');
 const officialStatic = path.join(root, 'skills/ppt-master/scripts/confirm_ui/static');
