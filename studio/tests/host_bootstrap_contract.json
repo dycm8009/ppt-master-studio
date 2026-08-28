@@ -18,5 +18,10 @@
   "official_harness_owns_ppt_workflow": true,
   "lazy_supporting_document_loading_required": true,
   "duplicate_studio_authority_documents_allowed": false,
-  "runtime_bundle_is_whitelist": true
+  "runtime_bundle_is_whitelist": true,
+  "confirmation_surface_failure_changes_transport_only": true,
+  "chat_fallback_requires_explicit_user_confirmation_unless_delegated": true,
+  "fallback_notice_counts_as_confirmation": false,
+  "assistant_recommendation_counts_as_confirmation": false,
+  "silence_counts_as_confirmation": false
 }
