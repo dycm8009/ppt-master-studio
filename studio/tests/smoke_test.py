@@ -54,9 +54,9 @@ def run(*args, ok=True):
 
 def main() -> int:
     version = json.loads((ROOT / 'studio/VERSION.json').read_text(encoding='utf-8'))
-    assert version['studio_version'] == '3.4.0'
+    assert version['studio_version'] == '3.4.1'
     assert version['project_contract_version'] == '3.2.0'
-    assert version['host_bootstrap_revision'] >= 7
+    assert version['host_bootstrap_revision'] >= 8
     assert version['control_plane_revision'] >= 5
     assert version['hosted_ui_revision'] >= 1
     assert version['official_confirm_host_revision'] >= 1
@@ -68,8 +68,10 @@ def main() -> int:
     assert 'official SVG Editor frontend' in version['hosted_editor_policy']
     assert 'filesystem mutation authority' in version['hosted_editor_policy']
     assert 'immutable Cloudflare Worker' in version['hosted_ui_immutable_worker_policy']
+    assert 'branch and artifact actions' in version['fresh_chat_bootstrap_policy']
+    assert 'matching non-expired Runtime artifact' in version['fresh_chat_bootstrap_policy']
     assert 'frozen' in version['mini_app_transport_policy']
-    assert 'not part of the default v3.4.0 Runtime bundle' in version['stage1_mini_app_policy']
+    assert 'not part of the default v3.4.x Runtime bundle' in version['stage1_mini_app_policy']
     assert 'never decision ownership' in version['human_confirmation_fallback_policy']
     assert version['connector_discovery_required'] is True
     assert version['preloaded_tool_absence_is_connector_unavailable'] is False
@@ -80,6 +82,7 @@ def main() -> int:
     instructions = (ROOT / 'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
     entry = (ROOT / 'studio/host/chatgpt/ENTRYPOINT.md').read_text(encoding='utf-8')
     host_rules = (ROOT / 'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md').read_text(encoding='utf-8')
+    host_contract = json.loads((ROOT / 'studio/tests/host_bootstrap_contract.json').read_text(encoding='utf-8'))
     assert len(instructions.encode('utf-8')) < 1400
     assert '不得直接进入普通 slides authoring' in instructions
     assert 'studio/host/chatgpt/ENTRYPOINT.md' in instructions
@@ -100,19 +103,34 @@ def main() -> int:
         'no separate Studio Motion Review page',
         'Frozen legacy transports',
         'Human-confirmation invariant',
+        'current-session `studio-main` **branch metadata**',
+        'workflow/artifact actions',
+        'artifact-download action',
     ]:
         assert required in entry, required
     assert 'immutable Worker URL' in entry
     assert 'never silently use a newer `latest` Hosted UI for a RESUME project' in entry
     assert 'Do not ask the user to copy a token, long JSON URL, or confirmation JSON' in entry
     assert 'execution-container networking' in entry
-    assert 'discover connector resources' in entry
+    assert 'dynamic connector discovery' in entry
+    assert 'Do not report `artifact_download: unavailable/not exposed`' in entry
     assert 'change only the transport, never the owner of the decision' in entry
     assert 'wait for an explicit user confirmation or revision' in entry
 
+    assert 'Deterministic ChatGPT connector discovery' in host_rules
     assert 'Absence from the initially preloaded tool list is not proof' in host_rules
+    assert '`head_sha` exactly equals the pinned SHA' in host_rules
+    assert '`artifact_download: not exposed` is not a valid failure reason' in host_rules
     assert 'Harness materialization capability unavailable' in host_rules
     assert 'does not define PPT workflow' in host_rules
+
+    assert host_contract['schema'] == 'ppt-master-studio-host-bootstrap-contract/v6'
+    assert host_contract['connector_resource_discovery_required'] is True
+    assert host_contract['connector_branch_metadata_authoritative_when_available'] is True
+    assert host_contract['code_search_commit_page_or_cached_web_cannot_define_current_head'] is True
+    assert host_contract['artifact_actions_must_be_discovered_before_failure'] is True
+    assert host_contract['matching_nonexpired_artifact_must_be_download_attempted'] is True
+    assert host_contract['runtime_artifact_workflow_head_sha_must_equal_pin'] is True
 
     hosted = json.loads((ROOT / 'studio/host/cloudflare/HOSTED_UI.json').read_text(encoding='utf-8'))
     assert hosted['schema'] == 'ppt-master-studio-hosted-ui-config/v2'
@@ -213,7 +231,7 @@ def main() -> int:
         assert mismatch.returncode == 86
         assert 'does not match project pin' in mismatch.stdout
 
-    print('studio v3.4.0 Hosted official UI smoke: passed')
+    print('studio v3.4.1 fresh-chat bootstrap + Hosted official UI smoke: passed')
     return 0
 
 
