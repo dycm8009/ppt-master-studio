@@ -79,7 +79,10 @@ def main() -> None:
         assert stage["gate_plan"]["artifact_editor"] == "enabled"
         assert stage["gate_plan"]["native_handoff"] == "unavailable"
         assert stage["authority"]["capture_is_accepted"] is False
+        assert stage["authority"]["manual_handoff"] == "copy-paste-canonical-json"
         assert "AI Agent 开发者" in stage["render"]["content"]
+        assert "复制并继续" in stage["render"]["content"]
+        assert stage["render"]["content"].count("<script") == 1
 
         deck = build_artifact_package(project, "deck-review")
         assert deck["surface"] == "deck-review"
@@ -91,6 +94,8 @@ def main() -> None:
         assert "data:image/png;base64," in slide["svg"]
         assert deck["model"]["svg_roster_sha256"] in deck["render"]["content"]
         assert deck["gate_plan"]["fallback_required_for_gate_completion"] is True
+        assert "复制并继续" in deck["render"]["content"]
+        assert deck["render"]["content"].count("<script") == 1
 
         (project / "svg_output" / "slide-01.svg").write_text(
             '<svg xmlns="http://www.w3.org/2000/svg"><image id="remote" href="https://example.com/image.png"/></svg>',
