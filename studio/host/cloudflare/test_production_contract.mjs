@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const worker = fs.readFileSync(path.join(here, 'worker_production.js'), 'utf8');
+const core = fs.readFileSync(path.join(here, 'core.js'), 'utf8');
+const editorCore = fs.readFileSync(path.join(here, 'editor_core.js'), 'utf8');
 const prod = fs.readFileSync(path.join(here, 'wrangler.production.jsonc'), 'utf8');
 const config = JSON.parse(fs.readFileSync(path.join(here, 'HOSTED_UI.json'), 'utf8'));
 
@@ -21,7 +23,6 @@ for (const required of [
   "response|advance|close",
   'stub.closeHost(hostKey',
   'stub.editorCloseHost(hostKey',
-  "captured-not-validated",
   '/api/editor-sessions',
   '/api/save-all',
   '/official-confirm.html',
@@ -30,6 +31,14 @@ for (const required of [
 ]) {
   if (!worker.includes(required)) throw new Error(`production Worker contract missing: ${required}`);
 }
+
+if (!core.includes("status: 'captured-not-validated'") || !core.includes("harness_status: 'not-validated'")) {
+  throw new Error('Confirm capture layer crossed the Harness authority boundary');
+}
+if (!editorCore.includes("status: 'captured-not-applied'") || !editorCore.includes("harness_status: 'not-validated'")) {
+  throw new Error('SVG Editor capture layer crossed the Harness authority boundary');
+}
+if (!core.includes('async closeHost(hostKey')) throw new Error('Confirm host close is not authenticated');
 
 if (!prod.includes('"name": "ppt-master-hosted-confirm"')) throw new Error('production Worker name mismatch');
 if (!prod.includes('"main": "worker_production.js"')) throw new Error('production config does not use clean Worker');
