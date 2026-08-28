@@ -41,7 +41,7 @@ BASE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" 
 
 def browser_json(opener, method: str, url: str, body=None):
     data = None
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "application/json", "User-Agent": bridge.HOST_USER_AGENT}
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -91,7 +91,12 @@ def main() -> int:
 
             jar = http.cookiejar.CookieJar()
             opener = build_opener(HTTPCookieProcessor(jar))
-            with opener.open(f"{remote_base}/e/{session}", timeout=30) as response:
+            opener.addheaders = [("User-Agent", bridge.HOST_USER_AGENT)]
+            page_request = Request(
+                f"{remote_base}/e/{session}",
+                headers={"User-Agent": bridge.HOST_USER_AGENT},
+            )
+            with opener.open(page_request, timeout=30) as response:
                 if response.status != 200:
                     raise RuntimeError(f"Hosted Editor page status {response.status}")
 
