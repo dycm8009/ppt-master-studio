@@ -28,12 +28,21 @@ jobs:
       - name: Check official frontend/API drift
         working-directory: studio/host/cloudflare
         run: npm run test:contract
+      - name: Test compact browser handoff
+        working-directory: studio/host/cloudflare
+        run: python test_confirm_handoff.py
       - name: Test hosted Stage 1 -> Stage 2 lifecycle
         working-directory: studio/host/cloudflare
         run: node test_hosted_official.mjs
       - name: Test hosted official SVG Editor lifecycle
         working-directory: studio/host/cloudflare
         run: node test_hosted_editor.mjs
-      - name: Wrangler bundle dry-run
+      - name: Compile Runtime bridge helpers
+        working-directory: studio/host/cloudflare
+        run: python -m py_compile hosted_confirm_handoff.py hosted_editor_bridge.py test_runtime_roundtrip.py
+      - name: Wrangler dev bundle dry-run
         working-directory: studio/host/cloudflare
         run: npx wrangler deploy --dry-run --config wrangler.jsonc
+      - name: Wrangler production bundle dry-run
+        working-directory: studio/host/cloudflare
+        run: npx wrangler deploy --dry-run --config wrangler.prod.jsonc
