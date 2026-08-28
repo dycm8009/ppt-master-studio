@@ -15,20 +15,31 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.2.3'
+    assert v['studio_version']=='3.2.4'
     assert v['static_ui_revision']>=2
     assert v['static_ui_history_limit']==4
     assert v['project_contract_version']=='3.2.0'
-    assert v['host_bootstrap_revision']>=3
+    assert v['host_bootstrap_revision']>=4
+    assert v['connector_discovery_required'] is True
+    assert v['preloaded_tool_absence_is_connector_unavailable'] is False
+    assert v['fresh_sha_resolution_required'] is True
+    assert v['host_download_primitive_allowed'] is True
     assert v['container_network_fallback_forbidden'] is True
     assert v['runtime_release_tag_pattern']=='studio-runtime-{commit}'
     assert v['runtime_release_asset_pattern']=='ppt-master-studio-runtime-{commit}.zip'
     contract=json.loads((ROOT/'studio/tests/host_bootstrap_contract.json').read_text())
-    assert contract['schema']=='ppt-master-studio-host-bootstrap-contract/v3'
+    assert contract['schema']=='ppt-master-studio-host-bootstrap-contract/v4'
     assert contract['new_project_requires_recovery_bundle'] is False
     assert contract['host_capability_detection_required'] is True
-    assert contract['sha_resolution_order']==['github_connector','native_web_github_api']
-    assert contract['runtime_materialization_order']==['local_verified_runtime_bundle','github_connector_workflow_artifact','native_host_release_download','native_host_exact_sha_archive']
+    assert contract['connector_resource_discovery_required'] is True
+    assert contract['preloaded_tool_absence_counts_as_connector_unavailable'] is False
+    assert contract['fresh_sha_must_come_from_current_session_branch_metadata'] is True
+    assert contract['stale_literal_sha_forbidden'] is True
+    assert contract['sha_resolution_order']==['github_connector_after_discovery','native_web_github_api']
+    assert contract['runtime_materialization_order']==['local_verified_runtime_bundle','github_connector_workflow_artifact_after_discovery','native_host_release_download','native_host_exact_sha_archive']
+    assert contract['artifact_download_action_must_be_discovered_before_materialization_fail_closed'] is True
+    assert contract['host_download_primitive_is_native_host_file_download'] is True
+    assert contract['release_existence_must_be_checked_for_fresh_sha'] is True
     assert contract['container_network_fallback_forbidden'] is True
     assert contract['container_network_failure_counts_as_web_attempt'] is False
     assert contract['fail_closed_only_after_supported_host_paths_exhausted'] is True
@@ -38,12 +49,21 @@ def main():
     bootstrap=(ROOT/'studio/PROJECT_BOOTSTRAP.md').read_text(encoding='utf-8')
     host_rules=(ROOT/'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md').read_text(encoding='utf-8')
     assert 'NEW 项目不需要 *.ppt-recovery.zip' in instructions
-    assert 'Host Capability Detection' in instructions
-    assert '容器网络失败只能说明容器不能联网' in instructions
+    assert 'Connector Discovery + Host Capability Detection' in instructions
+    assert '没有预先出现在当前工具列表' in instructions
+    assert '本次会话、本次 bootstrap 中实时读取' in instructions
+    assert '当前预加载工具里没有 download action' in instructions
     assert 'Harness materialization capability unavailable' in instructions
     assert 'A brand-new project does **not** require a Recovery Bundle.' in bootstrap
-    assert 'execution container' in bootstrap and 'does not count as a public GitHub Web/API attempt' in bootstrap
-    assert 'Container networking is not a Web fallback' in host_rules
+    assert 'absence from the immediately preloaded tool list is not enough' in bootstrap
+    assert 'fresh current-session read' in bootstrap
+    assert 'explicit host-provided URL/file download primitive' in bootstrap
+    assert 'Discover before declaring unavailable' in host_rules
+    assert 'does **not** prove the connector or action is unavailable' in host_rules
+    assert 'Fresh SHA resolution' in host_rules
+    assert 'Do not reuse a literal SHA' in host_rules
+    assert 'discover GitHub artifact-related actions' in host_rules
+    assert 'host-provided download tool' in host_rules
     assert 'must never be reported as “public GitHub Web/API was attempted and failed.”' in host_rules
     assert 'Harness materialization capability unavailable' in host_rules
     assert (ROOT/'.github/workflows/studio-runtime-release.yml').is_file()
