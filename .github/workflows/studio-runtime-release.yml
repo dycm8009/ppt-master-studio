@@ -31,6 +31,7 @@ jobs:
             studio/scripts/enforced_preflight.py \
             studio/scripts/enforced_recovery.py \
             studio/scripts/mini_app_builder.py \
+            studio/scripts/stage1_mini_app.py \
             studio/scripts/static_ui_adapter.py \
             studio/static_ui
           sha256sum "$ASSET" > "$ASSET.sha256"
