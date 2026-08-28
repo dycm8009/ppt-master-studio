@@ -23,10 +23,22 @@ jobs:
           node-version: '24'
       - name: Compile Studio scripts
         run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py studio/hosted_ui_poc/validate_stage1_gate.py
+      - name: Compile chat-inline artifact adapter
+        run: python -m compileall studio/artifact_ui_poc
       - name: Load Static UI Adapter
         run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio smoke tests
         run: python studio/tests/smoke_test.py
+      - name: Chat-inline artifact authority and parity tests
+        run: |
+          python -m studio.artifact_ui_poc.test_contract
+          python -m studio.artifact_ui_poc.test_handoff
+          python -m studio.artifact_ui_poc.test_adapter
+          python -m studio.artifact_ui_poc.test_project_models
+          python -m studio.artifact_ui_poc.test_renderer
+          python -m studio.artifact_ui_poc.test_stage2_parity
+          python -m studio.artifact_ui_poc.test_motion_parity
+          python -m studio.artifact_ui_poc.test_package
       - name: Install Hosted UI POC dependencies
         working-directory: studio/hosted_ui_poc
         run: npm install --no-audit --no-fund
