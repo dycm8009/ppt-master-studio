@@ -41,8 +41,10 @@ jobs:
         run: python studio/tests/smoke_test.py
 
       - name: Install Hosted UI test dependencies
-        working-directory: studio/host/cloudflare
-        run: npm install --no-audit --no-fund
+        run: |
+          python -m pip install 'flask>=3.0.0'
+          cd studio/host/cloudflare
+          npm install --no-audit --no-fund
 
       - name: Validate official Hosted UI contracts
         working-directory: studio/host/cloudflare
