@@ -37,13 +37,17 @@ def main() -> int:
     assert "Absence from the tool/action list is **not** evidence" in direct
     assert "Do not claim `current host has no inline app_block interface`" in direct
 
+    # Project Instructions are intentionally router-only. They own the artifact
+    # entry point, while volatile response-serialization details remain in the
+    # pinned repository contracts above.
     project_instructions = (STUDIO / "CHATGPT_PROJECT_INSTRUCTIONS.txt").read_text(encoding="utf-8")
-    assert "artifact-first active probe" in project_instructions
-    assert "direct response content reference 本身就是本会话 host capability probe" in project_instructions
-    assert 'genui{"app_block":' in project_instructions
-    assert "工具列表里没有 `app_block`" in project_instructions
-    assert "仅仅看不到 `app_block` tool/action 不是 fallback 证据" in project_instructions
-    assert "缺少 callback 只影响 handoff" in project_instructions
+    assert "chat-inline artifact UI entry" in project_instructions
+    assert "python -m studio.artifact_ui_poc.build_artifact <surface> <project>" in project_instructions
+    assert "direct response transport" in project_instructions
+    assert "pinned repo 的 Host Capability / Artifact Render Contract" in project_instructions
+    assert "captured ≠ accepted" in project_instructions
+    assert 'genui{"app_block":' not in project_instructions
+    assert "工具列表里没有 `app_block`" not in project_instructions
 
     host_rules = (STUDIO / "enforcement" / "PPT_MASTER_HOST_CAPABILITY_RULES.md").read_text(encoding="utf-8")
     assert "## 8. Chat-inline artifact active probe" in host_rules
