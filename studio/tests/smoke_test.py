@@ -27,12 +27,13 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.3.2'
+    assert v['studio_version']=='3.3.3'
     assert v['project_contract_version']=='3.2.0'
     assert v['host_bootstrap_revision']>=6
     assert v['project_router_revision']>=2
-    assert v['control_plane_revision']>=3
-    assert v['mini_app_transport_revision']>=1
+    assert v['control_plane_revision']>=4
+    assert v['mini_app_transport_revision']>=2
+    assert v['stage1_mini_app_revision']>=1
     assert 'host adapter only' in v['control_plane_policy']
     assert 'minimal PPT-to-Studio routing contract' in v['project_router_policy']
     assert 'Load only' in v['lazy_load_policy']
@@ -42,6 +43,8 @@ def main():
     assert 'code-block Preview' in v['mini_app_transport_policy']
     assert 'must not redefine the official Gate schema' in v['mini_app_transport_policy']
     assert 'must not assume an undocumented automatic callback' in v['mini_app_transport_policy']
+    assert 'rich chat-confirmation transport' in v['stage1_mini_app_policy']
+    assert 'must not fabricate official Confirm UI receipts' in v['stage1_mini_app_policy']
     assert v['connector_discovery_required'] is True
     assert v['preloaded_tool_absence_is_connector_unavailable'] is False
     assert v['fresh_sha_resolution_required'] is True
@@ -94,9 +97,11 @@ def main():
     assert 'Do not preload Studio workflow/template/UI/motion/QA policy' in entry
     assert 'discover connector resources' in entry
     assert 'execution-container networking' in entry
-    assert 'Interactive Code Block mini app' in entry
+    assert 'stage1_mini_app.py' in entry
+    assert 'rich **chat confirmation** surface' in entry
+    assert 'must not create or fabricate `result.json`' in entry
+    assert 'context changed, regenerate the mini app' in entry
     assert 'mini_app_builder.py' in entry
-    assert 'one self-contained HTML code block' in entry
     assert 'Do not serialize raw `app_block`/GenUI markers' in entry
     assert 'must not assume an undocumented automatic callback' in entry
     assert 'Human-confirmation invariant' in entry
@@ -108,11 +113,15 @@ def main():
     assert 'does not define PPT workflow' in host_rules
     assert len(host_rules.encode('utf-8')) < 5000
 
-    # Upstream already owns the same semantic boundary: after page failure/timeout,
-    # chat must ask the unresolved Stage-1 items and wait explicitly.
+    # Official Harness owns Stage-1 field/ordering semantics; the host adapter
+    # must only improve the chat confirmation surface.
     confirm_ui=(ROOT/'skills/ppt-master/scripts/docs/confirm_ui.md').read_text(encoding='utf-8')
     assert 'The handoff is context, not confirmation, and silence confirms' in confirm_ui
     assert 'open chat questions and wait explicitly' in confirm_ui
+    assert 'recommendations.stage1.json' in confirm_ui
+    assert 'template_options.json' in confirm_ui
+    assert 'All seven Stage-1 prose values may be blank' in confirm_ui
+    assert 'without fabricating these UI receipts' in confirm_ui
 
     for rel in DELETED_CONTROL_DOCS:
         assert not (ROOT/rel).exists(), f'duplicate control document still present: {rel}'
@@ -123,15 +132,16 @@ def main():
     assert 'studio/host/chatgpt/ENTRYPOINT.md' in release
     assert 'PPT_MASTER_HOST_CAPABILITY_RULES.md' in release
     assert 'studio/scripts/mini_app_builder.py' in release
+    assert 'studio/scripts/stage1_mini_app.py' in release
     assert 'studio/artifact_ui_poc' not in release
     assert 'studio/regression' not in release
 
     run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
 
-    # Interactive Code Block mini app POC: self-contained HTML, no external
-    # transport marker, local interaction, and explicit structured result.
+    # Generic Interactive Code Block mini-app transport remains available for
+    # confirmation surfaces that do not yet have a dedicated adapter.
     with tempfile.TemporaryDirectory() as mini_td:
-        mini_path=Path(mini_td)/'stage1_poc.html'
+        mini_path=Path(mini_td)/'generic_poc.html'
         run(ROOT/'studio/scripts/mini_app_builder.py','sample','--output',mini_path)
         mini=mini_path.read_text(encoding='utf-8')
         assert '<!doctype html>' in mini
@@ -145,7 +155,7 @@ def main():
         block=run(ROOT/'studio/scripts/mini_app_builder.py','sample','--code-block').stdout
         assert block.startswith('```html\n<!doctype html>') and block.rstrip().endswith('```')
 
-    # Static UI remains a host fallback component, but it is not bootstrap authority.
+    # Static UI remains a last-resort host fallback component, not workflow authority.
     if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
     adapter=importlib.import_module('studio.scripts.static_ui_adapter')
     with tempfile.TemporaryDirectory() as ui_td:
@@ -186,6 +196,6 @@ def main():
         p=run(ROOT/'studio/scripts/enforced_preflight.py',restored,'--running-commit',bad,ok=False)
         assert p.returncode==86 and 'does not match project pin' in p.stdout
 
-    print('studio v3.3.2 mini-app transport smoke: passed')
+    print('studio v3.3.3 Stage-1 mini-app smoke: passed')
     return 0
 if __name__=='__main__': raise SystemExit(main())
