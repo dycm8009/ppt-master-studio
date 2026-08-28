@@ -27,15 +27,17 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.3.0'
+    assert v['studio_version']=='3.3.1'
     assert v['project_contract_version']=='3.2.0'
     assert v['host_bootstrap_revision']>=6
     assert v['project_router_revision']>=2
-    assert v['control_plane_revision']>=1
+    assert v['control_plane_revision']>=2
     assert 'host adapter only' in v['control_plane_policy']
     assert 'minimal PPT-to-Studio routing contract' in v['project_router_policy']
     assert 'Load only' in v['lazy_load_policy']
     assert 'whitelist' in v['runtime_bundle_policy']
+    assert 'never decision ownership' in v['human_confirmation_fallback_policy']
+    assert 'wait for explicit user confirmation or revision' in v['human_confirmation_fallback_policy']
     assert v['connector_discovery_required'] is True
     assert v['preloaded_tool_absence_is_connector_unavailable'] is False
     assert v['fresh_sha_resolution_required'] is True
@@ -54,6 +56,11 @@ def main():
     assert contract['lazy_supporting_document_loading_required'] is True
     assert contract['duplicate_studio_authority_documents_allowed'] is False
     assert contract['runtime_bundle_is_whitelist'] is True
+    assert contract['confirmation_surface_failure_changes_transport_only'] is True
+    assert contract['chat_fallback_requires_explicit_user_confirmation_unless_delegated'] is True
+    assert contract['fallback_notice_counts_as_confirmation'] is False
+    assert contract['assistant_recommendation_counts_as_confirmation'] is False
+    assert contract['silence_counts_as_confirmation'] is False
 
     instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
     entry=(ROOT/'studio/host/chatgpt/ENTRYPOINT.md').read_text(encoding='utf-8')
@@ -73,10 +80,20 @@ def main():
     assert 'Do not preload Studio workflow/template/UI/motion/QA policy' in entry
     assert 'discover connector resources' in entry
     assert 'execution-container networking' in entry
+    assert 'Human-confirmation invariant' in entry
+    assert 'change only the transport, never the owner of the decision' in entry
+    assert 'wait for an explicit user confirmation or revision' in entry
+    assert 'fallback notice' in entry and 'is not user confirmation' in entry
     assert 'Absence from the initially preloaded tool list is not proof' in host_rules
     assert 'Harness materialization capability unavailable' in host_rules
     assert 'does not define PPT workflow' in host_rules
     assert len(host_rules.encode('utf-8')) < 5000
+
+    # Upstream already owns the same semantic boundary: after page failure/timeout,
+    # chat must ask the unresolved Stage-1 items and wait explicitly.
+    confirm_ui=(ROOT/'skills/ppt-master/scripts/docs/confirm_ui.md').read_text(encoding='utf-8')
+    assert 'The handoff is context, not confirmation, and silence confirms' in confirm_ui
+    assert 'present the same combined Stage-1 items as open chat questions and wait explicitly' in confirm_ui
 
     for rel in DELETED_CONTROL_DOCS:
         assert not (ROOT/rel).exists(), f'duplicate control document still present: {rel}'
@@ -132,6 +149,6 @@ def main():
         p=run(ROOT/'studio/scripts/enforced_preflight.py',restored,'--running-commit',bad,ok=False)
         assert p.returncode==86 and 'does not match project pin' in p.stdout
 
-    print('studio v3.3 control-plane smoke: passed')
+    print('studio v3.3.1 control-plane smoke: passed')
     return 0
 if __name__=='__main__': raise SystemExit(main())
