@@ -28,7 +28,7 @@ REQUIRED = [
     'studio/scripts/enforced_recovery.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
-STUDIO_VERSION = '3.2.3'
+STUDIO_VERSION = '3.2.4'
 PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
@@ -57,13 +57,17 @@ def main():
     if version.get('repository')!='dycm8009/ppt-master-studio': errors.append('VERSION.json repository mismatch')
     if version.get('studio_version')!=STUDIO_VERSION: errors.append('VERSION.json studio_version mismatch')
     if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
-    if int(version.get('host_bootstrap_revision') or 0) < 3: errors.append('VERSION.json host_bootstrap_revision must be >= 3')
+    if int(version.get('host_bootstrap_revision') or 0) < 4: errors.append('VERSION.json host_bootstrap_revision must be >= 4')
+    if version.get('connector_discovery_required') is not True: errors.append('VERSION.json must require connector discovery')
+    if version.get('preloaded_tool_absence_is_connector_unavailable') is not False: errors.append('VERSION.json must not equate preloaded-tool absence with connector unavailability')
+    if version.get('fresh_sha_resolution_required') is not True: errors.append('VERSION.json must require fresh SHA resolution')
+    if version.get('host_download_primitive_allowed') is not True: errors.append('VERSION.json must allow explicit host download primitive')
     if version.get('container_network_fallback_forbidden') is not True: errors.append('VERSION.json must forbid container network fallback')
     if int(version.get('static_ui_revision') or 0) < 2: errors.append('VERSION.json static_ui_revision must be >= 2')
     if version.get('runtime_release_tag_pattern')!='studio-runtime-{commit}': errors.append('VERSION.json runtime release tag pattern mismatch')
     if version.get('runtime_release_asset_pattern')!='ppt-master-studio-runtime-{commit}.zip': errors.append('VERSION.json runtime release asset pattern mismatch')
     status='passed' if not missing and not errors else 'failed'
-    report={'schema':'ppt-master-studio-bootstrap/v1','studio_version':version.get('studio_version',STUDIO_VERSION),'project_contract_version':version.get('project_contract_version',PROJECT_CONTRACT_VERSION),'upstream_skill_version':version.get('upstream_skill_version','5.0.0'),'repo_root':str(root),'repository':version.get('repository'),'running_commit':requested,'checkout_head':actual,'host_bootstrap_revision':version.get('host_bootstrap_revision'),'container_network_fallback_forbidden':version.get('container_network_fallback_forbidden'),'static_ui_revision':version.get('static_ui_revision'),'status':status,'missing':missing,'errors':errors}
+    report={'schema':'ppt-master-studio-bootstrap/v1','studio_version':version.get('studio_version',STUDIO_VERSION),'project_contract_version':version.get('project_contract_version',PROJECT_CONTRACT_VERSION),'upstream_skill_version':version.get('upstream_skill_version','5.0.0'),'repo_root':str(root),'repository':version.get('repository'),'running_commit':requested,'checkout_head':actual,'host_bootstrap_revision':version.get('host_bootstrap_revision'),'connector_discovery_required':version.get('connector_discovery_required'),'fresh_sha_resolution_required':version.get('fresh_sha_resolution_required'),'host_download_primitive_allowed':version.get('host_download_primitive_allowed'),'container_network_fallback_forbidden':version.get('container_network_fallback_forbidden'),'static_ui_revision':version.get('static_ui_revision'),'status':status,'missing':missing,'errors':errors}
     text=json.dumps(report,ensure_ascii=False,indent=2); print(text)
     if args.json:
         args.json.parent.mkdir(parents=True,exist_ok=True); args.json.write_text(text+'\n',encoding='utf-8')
