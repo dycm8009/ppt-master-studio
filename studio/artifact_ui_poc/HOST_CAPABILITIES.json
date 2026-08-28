@@ -1,6 +1,14 @@
 {
   "schema": "ppt-master-chat-inline-artifact-host-capabilities/v1",
   "host_surface": "chat-inline-interactive-ui-artifact",
+  "probe_policy": {
+    "mode": "artifact-first-active-probe",
+    "probe_each_conversation": true,
+    "prior_chat_evidence_required": false,
+    "build_artifact_before_static_ui_fallback": true,
+    "render_contract": "studio/artifact_ui_poc/CHATGPT_RENDER_CONTRACT.md",
+    "fallback_only_on_explicit_unavailability_or_render_failure": true
+  },
   "verified": {
     "embedded_render": true,
     "local_form_state": true,
@@ -20,7 +28,8 @@
   },
   "blocked_gate": "host_handoff",
   "notes": [
-    "Do not substitute Sites, MCP Apps, external domains, or standalone browser pages for this experiment.",
+    "The first inline render attempt in each new conversation is the presentation-host capability probe; no previous chat is required.",
+    "Do not substitute Sites, MCP Apps, external domains, or standalone browser pages for this path.",
     "A future supported host bridge should transport an already-frozen canonical envelope; it must not create accepted receipts."
   ]
 }
