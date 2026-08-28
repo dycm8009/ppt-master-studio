@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
-const root = process.cwd();
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, '../../..');
 const appPath = path.join(root, 'skills/ppt-master/scripts/confirm_ui/static/app.js');
 const serverPath = path.join(root, 'skills/ppt-master/scripts/confirm_ui/server.py');
-const contractPath = path.join(root, 'studio/host/cloudflare/official_confirm_ui_contract.json');
+const contractPath = path.join(here, 'official_confirm_ui_contract.json');
 
 const app = fs.readFileSync(appPath, 'utf8');
 const server = fs.readFileSync(serverPath, 'utf8');
