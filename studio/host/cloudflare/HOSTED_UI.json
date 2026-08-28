@@ -1,9 +1,12 @@
 {
-  "schema": "ppt-master-studio-hosted-ui-config/v1",
+  "schema": "ppt-master-studio-hosted-ui-config/v2",
   "provider": "cloudflare-workers",
   "production_base": "https://ppt-master-hosted-confirm.dycm-lab.workers.dev",
+  "immutable_base_pattern": "https://ppt-master-hosted-{commit12}.dycm-lab.workers.dev",
+  "immutable_worker_name_pattern": "ppt-master-hosted-{commit12}",
   "dev_base": "https://ppt-master-hosted-confirm-dev.dycm-lab.workers.dev",
   "session_ttl_seconds": 86400,
+  "pinned_asset_policy": "runtime sessions use the immutable Worker derived from the project's pinned 40-hex Harness commit; the production_base alias is navigational only",
   "authority": {
     "confirm": "local-pinned-official-confirm-ui",
     "svg_editor": "local-pinned-official-svg-editor"
