@@ -3,13 +3,6 @@ name: Hosted Official UI Deploy Production
 on:
   push:
     branches: [studio-main]
-    paths:
-      - 'studio/host/cloudflare/**'
-      - 'skills/ppt-master/scripts/confirm_ui/**'
-      - 'skills/ppt-master/scripts/svg_editor/**'
-      - 'skills/ppt-master/templates/icons/**'
-      - 'skills/ppt-master/references/ai-image-comparison/**'
-      - '.github/workflows/hosted-official-ui-deploy-prod.yml'
   workflow_dispatch:
 
 jobs:
