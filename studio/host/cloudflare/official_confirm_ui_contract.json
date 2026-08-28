@@ -1,0 +1,75 @@
+{
+  "schema": "ppt-master-studio-official-confirm-ui-host-contract/v1",
+  "authority": "skills/ppt-master/scripts/confirm_ui/static/app.js + skills/ppt-master/scripts/confirm_ui/server.py at the pinned Harness commit",
+  "purpose": "Cloudflare hosts the official Confirm UI frontend without redefining its Stage 1/2 schema or authoring Harness receipts.",
+  "frontend_assets": {
+    "root": "skills/ppt-master/scripts/confirm_ui/static/index.html",
+    "required": [
+      "/static/app.js",
+      "/static/style.css",
+      "/static/catalogs.json",
+      "/static/style_previews/<visual_style_id>.svg"
+    ],
+    "generated_image_reference_route": "/ai-image-comparison/rendering/<filename>.png"
+  },
+  "frontend_api": [
+    {
+      "method": "GET",
+      "path": "/api/session",
+      "purpose": "Return current wizard/session state. Stage 1 completion is followed by polling this endpoint until recommendation_stage_number >= 2."
+    },
+    {
+      "method": "GET",
+      "path": "/api/catalogs",
+      "purpose": "Return the official finite option universe. The hosted adapter must use the pinned Harness catalog response/snapshot, not a Studio-owned catalog."
+    },
+    {
+      "method": "GET",
+      "path": "/api/icon-previews",
+      "purpose": "Return the official icon preview payload used by the icon chooser."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-image-comparison",
+      "purpose": "Return the official generated-image rendering comparison manifest."
+    },
+    {
+      "method": "GET",
+      "path": "/api/recommendations",
+      "purpose": "Return the active official recommendation payload. Stage 1 includes browser-ready template_options; Stage 2 returns the final-plan recommendation. Must be no-store."
+    },
+    {
+      "method": "POST",
+      "path": "/api/confirm",
+      "purpose": "Capture the exact payload emitted by the official frontend. Cloudflare may mark it captured-not-validated, but must not manufacture local result.json/template_selection.json/template_handoff.json or claim Harness acceptance."
+    },
+    {
+      "method": "POST",
+      "path": "/api/shutdown",
+      "purpose": "Hosted semantic: mark the remote UI session complete/closed. Never terminate the Cloudflare Worker."
+    }
+  ],
+  "host_transport_api": [
+    "POST /api/sessions",
+    "GET /api/sessions/<48hex>",
+    "GET /api/sessions/<48hex>/response",
+    "POST /api/sessions/<48hex>/response"
+  ],
+  "session_routing": {
+    "browser_entry": "/s/<48hex>",
+    "strategy": "When /s/<token> is served, bind the browser to that Durable Object session using a secure host session mechanism. The unmodified official frontend may continue to issue absolute /api/* requests.",
+    "do_not": [
+      "Do not rewrite or fork official app.js merely to add the session token to each fetch.",
+      "Do not expose the bearer token to unrelated sessions.",
+      "Do not let /api/confirm claim accepted/validated status."
+    ]
+  },
+  "stage_semantics": {
+    "stage1": "Official frontend submits communication contract + template_selection together, then enters waiting state and polls /api/session for Stage 2 readiness.",
+    "between_stages": "The pinned local Harness remains responsible for validating/canonicalizing the Stage 1 decision, applying/freezing template state, completing template handoff/equivalent chat state, and authoring recommendations.stage2.json.",
+    "stage2": "Official frontend confirms final plan/production and then calls /api/shutdown. Hosted capture is still not Harness acceptance.",
+    "hosted_constraint": "A remote page cannot itself execute the local Harness. When host execution is required between stages, preserve the same logical session and use an explicit browser/chat handoff; never fake the missing Harness step inside Cloudflare."
+  },
+  "cache_policy": "All /api/* responses and user/session state are Cache-Control: no-store.",
+  "authority_policy": "Only the pinned local PPT Master Harness validates and continues the workflow. Cloudflare is a presentation/session transport adapter."
+}

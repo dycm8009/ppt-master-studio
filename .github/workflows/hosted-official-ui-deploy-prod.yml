@@ -1,0 +1,85 @@
+name: Hosted Official UI Deploy Production
+
+on:
+  push:
+    branches: [studio-main]
+    paths:
+      - 'studio/host/cloudflare/**'
+      - 'skills/ppt-master/scripts/confirm_ui/**'
+      - 'skills/ppt-master/scripts/svg_editor/**'
+      - 'skills/ppt-master/templates/icons/**'
+      - 'skills/ppt-master/references/ai-image-comparison/**'
+      - '.github/workflows/hosted-official-ui-deploy-prod.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve immutable release identity
+        id: release
+        shell: bash
+        run: |
+          SHORT="${GITHUB_SHA:0:12}"
+          echo "short=${SHORT}" >> "$GITHUB_OUTPUT"
+          echo "worker=ppt-master-hosted-${SHORT}" >> "$GITHUB_OUTPUT"
+          echo "url=https://ppt-master-hosted-${SHORT}.dycm-lab.workers.dev" >> "$GITHUB_OUTPUT"
+      - name: Require Cloudflare deployment credentials
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CF_API_TOKEN"
+          test -n "$CF_ACCOUNT_ID"
+      - name: Install dependencies
+        working-directory: studio/host/cloudflare
+        run: npm install --no-audit --no-fund
+      - name: Build pinned official UI assets
+        working-directory: studio/host/cloudflare
+        run: npm run build
+      - name: Validate contracts and transport
+        working-directory: studio/host/cloudflare
+        run: |
+          npm run test:contract
+          node test_hosted_official.mjs
+          node test_hosted_editor.mjs
+          python test_confirm_handoff.py
+          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_confirm_runtime_roundtrip.py test_runtime_roundtrip.py
+          npx wrangler deploy --dry-run --config wrangler.prod.jsonc
+      - name: Deploy immutable commit-bound Hosted UI
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: studio/host/cloudflare
+          wranglerVersion: '4.115.0'
+          command: deploy --config wrangler.prod.jsonc --name ${{ steps.release.outputs.worker }}
+      - name: Deploy current production alias
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: studio/host/cloudflare
+          wranglerVersion: '4.115.0'
+          command: deploy --config wrangler.prod.jsonc
+      - name: Install local Harness preview dependency
+        run: python -m pip install 'flask>=3.0.0'
+      - name: Validate pinned Confirm UI authority replay
+        working-directory: studio/host/cloudflare
+        run: python test_confirm_authority.py
+      - name: Validate immutable production Confirm Runtime round-trip
+        working-directory: studio/host/cloudflare
+        env:
+          PPT_MASTER_HOSTED_DEV_BASE: ${{ steps.release.outputs.url }}
+          PPT_MASTER_HARNESS_COMMIT: ${{ github.sha }}
+        run: python test_confirm_runtime_roundtrip.py
+      - name: Validate immutable production SVG Editor Runtime round-trip
+        working-directory: studio/host/cloudflare
+        env:
+          PPT_MASTER_HOSTED_DEV_BASE: ${{ steps.release.outputs.url }}
+          PPT_MASTER_HARNESS_COMMIT: ${{ github.sha }}
+        run: python test_runtime_roundtrip.py

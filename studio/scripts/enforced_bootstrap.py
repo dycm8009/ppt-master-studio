@@ -11,17 +11,22 @@ REQUIRED = [
     'skills/ppt-master/scripts/svg_quality_checker.py',
     'skills/ppt-master/scripts/svg_to_pptx.py',
     'skills/ppt-master/scripts/project_manager.py',
+    'skills/ppt-master/scripts/confirm_ui/server.py',
+    'skills/ppt-master/scripts/svg_editor/server.py',
     'studio/VERSION.json',
     'studio/host/chatgpt/ENTRYPOINT.md',
     'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md',
     'studio/scripts/enforced_checkpoint.py',
     'studio/scripts/enforced_preflight.py',
     'studio/scripts/enforced_recovery.py',
-    'studio/scripts/mini_app_builder.py',
-    'studio/scripts/stage1_mini_app.py',
+    'studio/host/cloudflare/HOSTED_UI.json',
+    'studio/host/cloudflare/hosted_url.py',
+    'studio/host/cloudflare/hosted_confirm_handoff.py',
+    'studio/host/cloudflare/hosted_confirm_bridge.py',
+    'studio/host/cloudflare/hosted_editor_bridge.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
-STUDIO_VERSION = '3.3.3'
+STUDIO_VERSION = '3.4.0'
 PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
@@ -50,11 +55,13 @@ def main():
     if version.get('repository')!='dycm8009/ppt-master-studio': errors.append('VERSION.json repository mismatch')
     if version.get('studio_version')!=STUDIO_VERSION: errors.append('VERSION.json studio_version mismatch')
     if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
-    if int(version.get('host_bootstrap_revision') or 0) < 6: errors.append('VERSION.json host_bootstrap_revision must be >= 6')
+    if int(version.get('host_bootstrap_revision') or 0) < 7: errors.append('VERSION.json host_bootstrap_revision must be >= 7')
     if int(version.get('project_router_revision') or 0) < 2: errors.append('VERSION.json project_router_revision must be >= 2')
-    if int(version.get('control_plane_revision') or 0) < 4: errors.append('VERSION.json control_plane_revision must be >= 4')
-    if int(version.get('mini_app_transport_revision') or 0) < 2: errors.append('VERSION.json mini_app_transport_revision must be >= 2')
-    if int(version.get('stage1_mini_app_revision') or 0) < 1: errors.append('VERSION.json stage1_mini_app_revision must be >= 1')
+    if int(version.get('control_plane_revision') or 0) < 5: errors.append('VERSION.json control_plane_revision must be >= 5')
+    if int(version.get('hosted_ui_revision') or 0) < 1: errors.append('VERSION.json hosted_ui_revision must be >= 1')
+    if int(version.get('official_confirm_host_revision') or 0) < 1: errors.append('VERSION.json official_confirm_host_revision must be >= 1')
+    if int(version.get('official_svg_editor_host_revision') or 0) < 1: errors.append('VERSION.json official_svg_editor_host_revision must be >= 1')
+    if version.get('motion_review_surface') is not False: errors.append('VERSION.json motion_review_surface must be false')
     if version.get('connector_discovery_required') is not True: errors.append('VERSION.json must require connector discovery')
     if version.get('preloaded_tool_absence_is_connector_unavailable') is not False: errors.append('VERSION.json must not equate preloaded-tool absence with connector unavailability')
     if version.get('fresh_sha_resolution_required') is not True: errors.append('VERSION.json must require fresh SHA resolution')
@@ -75,8 +82,9 @@ def main():
         'host_bootstrap_revision':version.get('host_bootstrap_revision'),
         'project_router_revision':version.get('project_router_revision'),
         'control_plane_revision':version.get('control_plane_revision'),
-        'mini_app_transport_revision':version.get('mini_app_transport_revision'),
-        'stage1_mini_app_revision':version.get('stage1_mini_app_revision'),
+        'hosted_ui_revision':version.get('hosted_ui_revision'),
+        'official_confirm_host_revision':version.get('official_confirm_host_revision'),
+        'official_svg_editor_host_revision':version.get('official_svg_editor_host_revision'),
         'status':status,
         'missing':missing,
         'errors':errors,

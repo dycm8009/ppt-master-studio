@@ -30,10 +30,11 @@ jobs:
             studio/scripts/enforced_checkpoint.py \
             studio/scripts/enforced_preflight.py \
             studio/scripts/enforced_recovery.py \
-            studio/scripts/mini_app_builder.py \
-            studio/scripts/stage1_mini_app.py \
-            studio/scripts/static_ui_adapter.py \
-            studio/static_ui
+            studio/host/cloudflare/HOSTED_UI.json \
+            studio/host/cloudflare/hosted_url.py \
+            studio/host/cloudflare/hosted_confirm_handoff.py \
+            studio/host/cloudflare/hosted_confirm_bridge.py \
+            studio/host/cloudflare/hosted_editor_bridge.py
           sha256sum "$ASSET" > "$ASSET.sha256"
       - name: Upload connector-downloadable runtime artifact
         uses: actions/upload-artifact@v4
@@ -59,5 +60,5 @@ jobs:
             gh release create "$TAG" "$ASSET" "$ASSET.sha256" \
               --target "$SHA" \
               --title "PPT Master Studio Runtime ${SHA}" \
-              --notes "Commit-bound minimal ChatGPT host runtime for PPT Master Studio. PPT workflow authority remains skills/ppt-master at commit ${SHA}; this ZIP is not a project Recovery Bundle."
+              --notes "Commit-bound minimal ChatGPT host runtime for PPT Master Studio. PPT workflow authority remains skills/ppt-master at commit ${SHA}; Cloudflare is only a Hosted official-UI transport and this ZIP is not a project Recovery Bundle."
           fi
