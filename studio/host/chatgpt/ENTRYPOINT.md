@@ -36,4 +36,6 @@ Load Studio host adapters only when their condition occurs:
 
 A host adapter may change transport or persistence, but must not invent a second PPT workflow, schema, design policy, motion policy, or QA authority.
 
+**Human-confirmation invariant:** a confirmation-surface failure may change only the transport, never the owner of the decision. Unless the user has explicitly delegated that confirmation, switching from Confirm UI/page to chat is a blocking human gate: present the current official Gate's unresolved confirmation items in chat, wait for an explicit user confirmation or revision, and only then persist/submit the confirmation and continue. A fallback notice, recommendation summary, silence, or assistant-authored choice is not user confirmation. Preserve any already-persisted valid receipt exactly as the official route requires.
+
 If required bootstrap material cannot be resolved or materialized after the supported host paths are genuinely exhausted, fail closed. Never fall back to generic slide authoring.
