@@ -40,7 +40,7 @@ jobs:
           node test_hosted_official.mjs
           node test_hosted_editor.mjs
           python test_confirm_handoff.py
-          python -m py_compile hosted_confirm_handoff.py hosted_editor_bridge.py
+          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_runtime_roundtrip.py
           npx wrangler deploy --dry-run --config wrangler.prod.jsonc
       - name: Deploy production Hosted UI
         uses: cloudflare/wrangler-action@v4
@@ -50,3 +50,14 @@ jobs:
           workingDirectory: studio/host/cloudflare
           wranglerVersion: '4.115.0'
           command: deploy --config wrangler.prod.jsonc
+      - name: Install local Harness preview dependency
+        run: python -m pip install 'flask>=3.0.0'
+      - name: Validate pinned Confirm UI authority replay
+        working-directory: studio/host/cloudflare
+        run: python test_confirm_authority.py
+      - name: Validate production Runtime round-trip
+        working-directory: studio/host/cloudflare
+        env:
+          PPT_MASTER_HOSTED_DEV_BASE: https://ppt-master-hosted-confirm.dycm-lab.workers.dev
+          PPT_MASTER_HARNESS_COMMIT: ${{ github.sha }}
+        run: python test_runtime_roundtrip.py
