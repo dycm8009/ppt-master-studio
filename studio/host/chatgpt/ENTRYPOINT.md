@@ -11,7 +11,11 @@ Use this file only when a PPT/PPTX task enters PPT Master Studio. It adapts the 
 
 For `NEW`, resolve the current `studio-main` 40-character SHA in this session, then pin it for the project. For `RESUME`, use the commit already recorded in project state/recovery; never silently upgrade it.
 
-When GitHub actions are not preloaded, discover connector resources before declaring them unavailable. Use host-native connector/Web/file-download capabilities only; execution-container networking (`git`, `curl`, `wget`, Python/Node HTTP) is not a substitute for Harness resolution/materialization.
+On ChatGPT, GitHub actions may exist through dynamic connector discovery even when they are absent from the initially visible tool list. Before declaring GitHub branch metadata, workflow artifacts, or artifact download unavailable, discover the relevant GitHub connector resources and actually invoke the discovered actions. For a NEW project, the authoritative current SHA is the value returned by current-session `studio-main` **branch metadata**. A code-search result, commit page, release tag, cached Web/search result, old chat value, or remembered SHA is not current branch metadata and must not define the pin. If connector branch metadata succeeds, do not replace it with a different Web/search value.
+
+After pinning the SHA, discover workflow/artifact actions and look for the `ppt-master-studio-runtime` artifact on a Studio Runtime Release run whose `head_sha` exactly matches the pin. If a matching non-expired artifact exists and an artifact-download action is available, call that download action before considering artifact materialization unavailable. Do not report `artifact_download: unavailable/not exposed` merely because it was not preloaded.
+
+Use host-native connector/Web/file-download capabilities only; execution-container networking (`git`, `curl`, `wget`, Python/Node HTTP) is not a substitute for Harness resolution/materialization.
 
 Detailed host-only resolution/materialization rules are in `studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md`. Load that file only while resolving or materializing the Harness.
 
@@ -55,7 +59,7 @@ There is **no separate Studio Motion Review page**. Motion remains entirely unde
 
 ### Frozen legacy transports
 
-Interactive Code Block mini-app and Studio static-UI implementations remain repository history/experimental fallback source, but v3.4.0 does not load or ship them as the default ChatGPT Runtime interaction path. Do not prefer them over the Hosted official UI.
+Interactive Code Block mini-app and Studio static-UI implementations remain repository history/experimental fallback source, but v3.4.x does not load or ship them as the default ChatGPT Runtime interaction path. Do not prefer them over the Hosted official UI.
 
 ### Human-confirmation invariant
 
