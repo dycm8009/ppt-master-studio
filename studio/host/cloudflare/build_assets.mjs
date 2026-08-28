@@ -9,6 +9,8 @@ const dist = path.join(hostDir, 'dist');
 const publicDir = path.join(hostDir, 'public');
 const officialStatic = path.join(root, 'skills/ppt-master/scripts/confirm_ui/static');
 const officialIndex = path.join(officialStatic, 'index.html');
+const officialEditorStatic = path.join(root, 'skills/ppt-master/scripts/svg_editor/static');
+const officialEditorIndex = path.join(officialEditorStatic, 'index.html');
 const iconRoot = path.join(root, 'skills/ppt-master/templates/icons');
 const aiRoot = path.join(root, 'skills/ppt-master/references/ai-image-comparison/rendering');
 
@@ -29,20 +31,39 @@ function stripSvg(raw) {
 fs.rmSync(dist, { recursive: true, force: true });
 ensureDir(dist);
 
-for (const name of ['index.html', 'bootstrap.js', 'host_bridge.js']) {
+for (const name of ['index.html', 'bootstrap.js', 'host_bridge.js', 'editor_host_bridge.js']) {
   fs.copyFileSync(path.join(publicDir, name), path.join(dist, name));
 }
 
+// Official Confirm UI: source files stay byte-for-byte pinned; only the wrapper
+// index receives the Hosted bridge before the official app.js.
 fs.cpSync(officialStatic, path.join(dist, 'static'), { recursive: true });
-
 let indexHtml = fs.readFileSync(officialIndex, 'utf8');
 const officialScript = '    <script src="/static/app.js"></script>';
-if (!indexHtml.includes(officialScript)) throw new Error('official index.html app.js marker changed');
+if (!indexHtml.includes(officialScript)) throw new Error('official Confirm UI index.html app.js marker changed');
 indexHtml = indexHtml.replace(
   officialScript,
   '    <script src="/host_bridge.js"></script>\n' + officialScript,
 );
 fs.writeFileSync(path.join(dist, 'official-confirm.html'), indexHtml);
+
+// Official SVG Editor: copy the official frontend unchanged to a separate
+// namespace. Rewrite only the wrapper index paths so Confirm UI /static and
+// SVG Editor /editor-static can coexist in the same Worker.
+fs.cpSync(officialEditorStatic, path.join(dist, 'editor-static'), { recursive: true });
+let editorHtml = fs.readFileSync(officialEditorIndex, 'utf8');
+const editorStyle = '    <link rel="stylesheet" href="/static/style.css">';
+const editorScript = '    <script src="/static/app.js"></script>';
+if (!editorHtml.includes(editorStyle) || !editorHtml.includes(editorScript)) {
+  throw new Error('official SVG Editor index.html asset markers changed');
+}
+editorHtml = editorHtml
+  .replace(editorStyle, '    <link rel="stylesheet" href="/editor-static/style.css">')
+  .replace(
+    editorScript,
+    '    <script src="/editor_host_bridge.js"></script>\n    <script src="/editor-static/app.js"></script>',
+  );
+fs.writeFileSync(path.join(dist, 'official-editor.html'), editorHtml);
 
 ensureDir(path.join(dist, 'generated'));
 const iconPreviews = {};
@@ -76,15 +97,21 @@ writeJson(path.join(dist, 'generated/ai-image-comparison.json'), { rendering });
 fs.cpSync(aiRoot, path.join(dist, 'ai-image-comparison/rendering'), { recursive: true });
 
 writeJson(path.join(dist, 'generated/source-manifest.json'), {
-  schema: 'ppt-master-hosted-official-assets/v1',
+  schema: 'ppt-master-hosted-official-assets/v2',
   sources: {
-    'static/index.html': sha256(officialIndex),
-    'static/app.js': sha256(path.join(officialStatic, 'app.js')),
-    'static/style.css': sha256(path.join(officialStatic, 'style.css')),
-    'static/catalogs.json': sha256(path.join(officialStatic, 'catalogs.json')),
+    'confirm_ui/static/index.html': sha256(officialIndex),
+    'confirm_ui/static/app.js': sha256(path.join(officialStatic, 'app.js')),
+    'confirm_ui/static/style.css': sha256(path.join(officialStatic, 'style.css')),
+    'confirm_ui/static/catalogs.json': sha256(path.join(officialStatic, 'catalogs.json')),
+    'svg_editor/static/index.html': sha256(officialEditorIndex),
+    'svg_editor/static/app.js': sha256(path.join(officialEditorStatic, 'app.js')),
+    'svg_editor/static/style.css': sha256(path.join(officialEditorStatic, 'style.css')),
     'ai-image-comparison/rendering/_manifest.json': sha256(manifestFile),
   },
-  host_injection: 'host_bridge.js inserted before the unmodified official /static/app.js',
+  host_injection: {
+    confirm_ui: 'host_bridge.js inserted before the unmodified official Confirm UI app.js',
+    svg_editor: 'editor_host_bridge.js inserted before the unmodified official SVG Editor app.js; only wrapper asset paths are namespaced',
+  },
 });
 
-console.log(`hosted official Confirm UI assets built: ${dist}`);
+console.log(`hosted official Confirm UI + SVG Editor assets built: ${dist}`);
