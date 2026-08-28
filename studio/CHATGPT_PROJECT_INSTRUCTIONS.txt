@@ -1,47 +1,7 @@
-[PPT MASTER STUDIO — PROJECT ROUTER]
+本项目所有 PPT/PPTX 创建、修改、美化、转换和质量检查任务均使用 PPT Master Studio；不得直接进入普通 slides authoring。
 
-本项目中的所有 PPT / PPTX / slide deck / presentation 创建、转换、美化、模板、动画、图片与质量检查任务，均属于 PPT_MASTER_TASK。
+收到 PPT/PPTX 请求后，先加载 GitHub `dycm8009/ppt-master-studio` 稳定分支 `studio-main` 中的 `studio/host/chatgpt/ENTRYPOINT.md`；用户不需要另说“初始化环境”。
 
-【1. 先分类，再执行】
-- RESUME：仅当用户明确要求继续已有工程，或提供有效 project_state.json / *.ppt-recovery.zip 并要求续作。
-- 其他情况一律 NEW。
-- 普通 PPTX、PDF、素材包、source ZIP、handoff ZIP 不会因为是附件而自动成为 RESUME。
-- NEW 不要求 Recovery Bundle。
+进入 Studio 后，只按当前步骤需要加载文件；PPT 的 Workflow、Gate、Template、Image、Motion、Recovery 与 QA 均由当前 pinned `skills/ppt-master` 官方 Harness 负责，不在 Project Instructions 中维护第二套规则。
 
-【2. PPT Master 必须接管 authoring】
-- 如果宿主对 PPT 请求先触发系统 slide/artifact handoff，允许该 handoff 发生；但 handoff 之后必须立即进入 PPT Master Studio bootstrap。
-- 不得把 generic/system slides 当成 authoring fallback，不得绕过 PPT Master Studio 直接生成整套页面。
-- 用户不需要说“初始化环境”；任何 PPT_MASTER_TASK 都必须自动执行本规则。
-
-【3. 唯一源码 Authority】
-- Repository: dycm8009/ppt-master-studio
-- Stable branch: studio-main
-- Development branch: studio-dev
-- main 仅作 upstream mirror。
-- 详细 Workflow / Template / Enforcement / Regression / Host 规则全部从本次实际加载的 pinned Studio commit 读取；不要从旧 Project 文件、旧 ZIP、历史聊天或记忆重建规则。
-
-【4. Bootstrap】
-- 所有 GitHub bootstrap 之前先读取并执行 pinned repo 的 `studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md`。
-- NEW：按 Host Capability Rules 执行 connector discovery / host capability detection，实时解析 studio-main 完整 commit SHA，锁定该 SHA，物化 Harness，运行官方 enforced bootstrap/self-check，然后读取 routing.md 并选择唯一顶层 workflow。
-- RESUME：优先读取 project_state.json，使用其中 pinned harness.commit，不得静默升级到最新 studio-main。
-- bootstrap / materialization / preflight 失败时 Fail Closed；不得退化为普通 slides 流程。
-
-【5. 交互确认 UI】
-- 到达 Stage 1 / Stage 2 / Deck Review / Motion Review 时，必须优先使用当前 pinned Studio repo 定义的 chat-inline artifact UI entry：`python -m studio.artifact_ui_poc.build_artifact <surface> <project>`。
-- inline artifact 的实际渲染探测、direct response transport、Parity、自包含要求与 Static UI fallback 条件全部以 pinned repo 的 Host Capability / Artifact Render Contract 为准，不在 Project Instructions 重复维护第二套规则。
-- 不得手写第二套 HTML / schema / canonical IDs。
-- 当前 inline artifact 的 Confirm 只视为 local captured；若宿主没有受支持的 assistant callback，用户仍需“复制并继续”把 canonical JSON 发回聊天，再由 `static_ui_adapter.py validate` 生成 accepted receipt。
-- captured ≠ accepted。只有官方 validator 生成的 accepted receipt 才能通过 Gate。
-
-【6. 执行纪律】
-- 18 页及以上执行 Studio Deck-level Art Direction。
-- 图片、动画、QA、模板兼容性等详细规则一律以 pinned Studio repo 为准，不在本项目指令中重复维护。
-- Beautify / Convert 默认保持原始内容、事实与页序，除非用户明确授权改写。
-- 最终导出必须通过 repo 定义的 SVG QA、Render Review、Deck Audit、Motion/Image Audit（如适用）和 PPTX Postflight。
-
-【7. 用户交互】
-- 用户已明确模板、视觉方向或流程决策后，直接继续执行。
-- 只有真实阻塞、需要用户决策或 Fail Closed 时才询问。
-
-本项目指令只负责 ROUTING + BOOTSTRAP + UI TRANSPORT ENTRY。
-所有详细执行规则必须从本次 pinned PPT Master Studio repository 读取。
+若 Studio bootstrap 真实失败则停止并报告阻塞；不得绕过 Studio 生成替代 PPT。
