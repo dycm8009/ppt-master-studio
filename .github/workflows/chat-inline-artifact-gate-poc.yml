@@ -1,0 +1,23 @@
+name: Chat Inline Artifact Gate POC
+
+on:
+  push:
+    branches:
+      - feature/chat-inline-artifact-gate-poc
+    paths:
+      - 'studio/artifact_ui_poc/**'
+      - '.github/workflows/chat-inline-artifact-gate-poc.yml'
+  workflow_dispatch:
+
+jobs:
+  artifact-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile artifact PoC
+        run: python -m compileall studio/artifact_ui_poc
+      - name: Verify capture and handoff boundary
+        run: python -m studio.artifact_ui_poc.test_contract
