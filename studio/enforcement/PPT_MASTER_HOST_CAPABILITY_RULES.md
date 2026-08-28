@@ -1,6 +1,6 @@
 # PPT Master Studio — Host Capability Rules
 
-These rules govern how a ChatGPT/serverless host resolves and materializes the pinned GitHub Harness.
+These rules govern how a ChatGPT/serverless host resolves and materializes the pinned GitHub Harness and how ChatGPT chooses the interactive Gate presentation host.
 
 ## 1. Discover before declaring unavailable
 On ChatGPT, a connector function not appearing in the immediately preloaded tool list does **not** prove the connector or action is unavailable.
@@ -16,10 +16,14 @@ After discovery, classify only capabilities actually usable in the current conve
 - `connector_artifact_download`: GitHub workflow-artifact download into a real runtime file.
 - `native_host_file_download`: any explicit host-provided URL/file materialization primitive outside the execution container's own network stack.
 - `local_execution`: ability to unpack and run the Harness locally.
+- `chat_inline_artifact_render`: ability for the assistant response to embed a host-native inline interactive app/artifact block.
+- `chat_inline_artifact_local_interaction`: local HTML/CSS/JS state and reactive interaction inside that embedded block.
 
 A host-provided download tool that writes a URL result to a runtime file counts as `native_host_file_download` even if the file ultimately lands in the execution environment, provided the network transfer is performed by the host tool rather than by shell/Python/Node networking inside the container.
 
-Never infer a capability from an earlier chat, from the fact that an app was installed, or from user memory.
+Never infer connector/network/materialization capabilities from an earlier chat, from the fact that an app was installed, or from user memory.
+
+For the chat-inline artifact presentation path, lack of prior-chat evidence is **not** evidence of unavailability. At each new conversation, use the active probe policy in Section 8.
 
 ## 3. Container networking is not a Web fallback
 The execution container's own network stack is not equivalent to ChatGPT-native Web access. Commands or libraries that try to reach GitHub directly from the container must not be used to satisfy the public-Web fallback contract.
@@ -64,3 +68,21 @@ A blocking message must distinguish:
 - RESUME evidence/recovery failure.
 
 It must list the actual host capabilities detected, discovery performed, the current-session SHA resolver source, and only the paths genuinely attempted.
+
+## 8. Chat-inline artifact active probe
+Chat-inline artifact rendering is a presentation-host capability, not a GitHub/network capability. It is tested independently.
+
+At the first PPT Master Gate surface in every new ChatGPT conversation:
+1. Build the canonical artifact package first with `python -m studio.artifact_ui_poc.build_artifact <surface> <project>`.
+2. Read `studio/artifact_ui_poc/CHATGPT_RENDER_CONTRACT.md` and attempt to embed the package's `render` payload as the host-native chat-inline app/artifact block in the assistant response.
+3. The render attempt itself is the current-conversation capability probe. Do **not** require a previous chat, memory, screenshot, or previous artifact instance before making the attempt.
+4. Do **not** pre-build or present Static UI HTML merely because `chat_inline_artifact_render` has not yet been proven in this conversation.
+5. Fall back to the versioned Static UI Adapter HTML only when one of these conditions is true:
+   - artifact package construction fails closed;
+   - the current response host explicitly exposes no supported inline app/artifact rendering mechanism;
+   - the host rejects the inline artifact render attempt;
+   - the artifact package is not self-contained under its parity/fail-closed rules.
+6. A successful inline render proves `chat_inline_artifact_render` for that conversation. Successful local editing proves `chat_inline_artifact_local_interaction`.
+7. Current verified behavior still has no supported artifact → assistant callback. Rendering success never changes Gate authority: local Confirm is `captured`, and `static_ui_adapter.py validate` remains the only accepted-receipt authority.
+
+Do not substitute Sites, MCP Apps, external domains, or standalone browser pages for this active probe.
