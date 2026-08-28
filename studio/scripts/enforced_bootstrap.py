@@ -26,7 +26,7 @@ REQUIRED = [
     'studio/host/cloudflare/hosted_editor_bridge.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
-STUDIO_VERSION = '3.4.0'
+STUDIO_VERSION = '3.4.1'
 PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
@@ -55,7 +55,7 @@ def main():
     if version.get('repository')!='dycm8009/ppt-master-studio': errors.append('VERSION.json repository mismatch')
     if version.get('studio_version')!=STUDIO_VERSION: errors.append('VERSION.json studio_version mismatch')
     if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
-    if int(version.get('host_bootstrap_revision') or 0) < 7: errors.append('VERSION.json host_bootstrap_revision must be >= 7')
+    if int(version.get('host_bootstrap_revision') or 0) < 8: errors.append('VERSION.json host_bootstrap_revision must be >= 8')
     if int(version.get('project_router_revision') or 0) < 2: errors.append('VERSION.json project_router_revision must be >= 2')
     if int(version.get('control_plane_revision') or 0) < 5: errors.append('VERSION.json control_plane_revision must be >= 5')
     if int(version.get('hosted_ui_revision') or 0) < 1: errors.append('VERSION.json hosted_ui_revision must be >= 1')
