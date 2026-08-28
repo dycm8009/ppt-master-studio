@@ -36,3 +36,4 @@ jobs:
           python -m studio.artifact_ui_poc.test_stage2_parity
           python -m studio.artifact_ui_poc.test_motion_parity
           python -m studio.artifact_ui_poc.test_package
+          python -m studio.artifact_ui_poc.test_render_contract
