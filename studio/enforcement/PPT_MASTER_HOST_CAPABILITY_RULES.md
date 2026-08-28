@@ -23,6 +23,8 @@ Use the first genuinely available path:
 
 Before declaring artifact download unavailable, discover GitHub artifact/download actions when discovery is exposed and actually call a discovered action. Absence from the initially preloaded tool list is not proof of unavailability.
 
+For the GitHub Actions artifact path, treat the downloaded artifact as an outer container ZIP: extract it, locate the exact `ppt-master-studio-runtime-{commit}.zip` and `.sha256`, verify the inner ZIP, extract it, then use that extracted directory as the Runtime root.
+
 Before saying a Runtime Release or asset does not exist, read metadata for the exact pinned SHA.
 
 ## Network boundary
