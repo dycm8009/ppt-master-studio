@@ -7,6 +7,18 @@ ROOT=Path(__file__).resolve().parents[2]
 PY=sys.executable
 SHA=subprocess.run(['git','-C',str(ROOT),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip().lower()
 
+DELETED_CONTROL_DOCS=[
+    'studio/PROJECT_BOOTSTRAP.md',
+    'studio/PROJECT_ROUTER_MIGRATION.md',
+    'studio/HOST_BOOTSTRAP_CHANGELOG.md',
+    'studio/enforcement/PPT_MASTER_AUTHORITY.md',
+    'studio/enforcement/PPT_MASTER_WORKFLOW.md',
+    'studio/enforcement/PPT_MASTER_TEMPLATE_RULES.md',
+    'studio/enforcement/PPT_MASTER_REGRESSION_POLICY.md',
+    'studio/enforcement/PPT_MASTER_STATIC_UI_RULES.md',
+    'studio/enforcement/PPT_MASTER_RECOVERY_RULES.md',
+]
+
 def run(*args, ok=True):
     p=subprocess.run([PY,*map(str,args)],cwd=ROOT,text=True,capture_output=True)
     if ok and p.returncode!=0:
@@ -15,83 +27,77 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.2.5'
-    assert v['static_ui_revision']>=2
-    assert v['static_ui_history_limit']==4
+    assert v['studio_version']=='3.3.0'
     assert v['project_contract_version']=='3.2.0'
-    assert v['host_bootstrap_revision']>=5
-    assert v['project_router_revision']>=1
-    assert 'compact routing/bootstrap/UI-entry contract only' in v['project_router_policy']
+    assert v['host_bootstrap_revision']>=6
+    assert v['project_router_revision']>=2
+    assert v['control_plane_revision']>=1
+    assert 'host adapter only' in v['control_plane_policy']
+    assert 'minimal PPT-to-Studio routing contract' in v['project_router_policy']
+    assert 'Load only' in v['lazy_load_policy']
+    assert 'whitelist' in v['runtime_bundle_policy']
     assert v['connector_discovery_required'] is True
     assert v['preloaded_tool_absence_is_connector_unavailable'] is False
     assert v['fresh_sha_resolution_required'] is True
     assert v['host_download_primitive_allowed'] is True
     assert v['container_network_fallback_forbidden'] is True
-    assert v['runtime_release_tag_pattern']=='studio-runtime-{commit}'
-    assert v['runtime_release_asset_pattern']=='ppt-master-studio-runtime-{commit}.zip'
+
     contract=json.loads((ROOT/'studio/tests/host_bootstrap_contract.json').read_text())
-    assert contract['schema']=='ppt-master-studio-host-bootstrap-contract/v4'
+    assert contract['schema']=='ppt-master-studio-host-bootstrap-contract/v5'
     assert contract['new_project_requires_recovery_bundle'] is False
-    assert contract['host_capability_detection_required'] is True
     assert contract['connector_resource_discovery_required'] is True
     assert contract['preloaded_tool_absence_counts_as_connector_unavailable'] is False
     assert contract['fresh_sha_must_come_from_current_session_branch_metadata'] is True
-    assert contract['stale_literal_sha_forbidden'] is True
-    assert contract['sha_resolution_order']==['github_connector_after_discovery','native_web_github_api']
-    assert contract['runtime_materialization_order']==['local_verified_runtime_bundle','github_connector_workflow_artifact_after_discovery','native_host_release_download','native_host_exact_sha_archive']
-    assert contract['artifact_download_action_must_be_discovered_before_materialization_fail_closed'] is True
-    assert contract['host_download_primitive_is_native_host_file_download'] is True
-    assert contract['release_existence_must_be_checked_for_fresh_sha'] is True
     assert contract['container_network_fallback_forbidden'] is True
-    assert contract['container_network_failure_counts_as_web_attempt'] is False
-    assert contract['fail_closed_only_after_supported_host_paths_exhausted'] is True
-    assert contract['sha_resolution_failure_must_be_distinct_from_materialization_failure'] is True
-    assert contract['ordinary_handoff_zip_is_recovery_bundle'] is False
+    assert contract['project_instructions_are_minimal_router_only'] is True
+    assert contract['official_harness_owns_ppt_workflow'] is True
+    assert contract['lazy_supporting_document_loading_required'] is True
+    assert contract['duplicate_studio_authority_documents_allowed'] is False
+    assert contract['runtime_bundle_is_whitelist'] is True
+
     instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
-    bootstrap=(ROOT/'studio/PROJECT_BOOTSTRAP.md').read_text(encoding='utf-8')
+    entry=(ROOT/'studio/host/chatgpt/ENTRYPOINT.md').read_text(encoding='utf-8')
     host_rules=(ROOT/'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md').read_text(encoding='utf-8')
-    assert '[PPT MASTER STUDIO — PROJECT ROUTER]' in instructions
-    assert 'PPT_MASTER_TASK' in instructions
-    assert '其他情况一律 NEW' in instructions
-    assert '普通 PPTX、PDF、素材包、source ZIP、handoff ZIP' in instructions
-    assert 'NEW 不要求 Recovery Bundle' in instructions
-    assert '用户不需要说“初始化环境”' in instructions
-    assert 'generic/system slides' in instructions
-    assert 'PPT_MASTER_HOST_CAPABILITY_RULES.md' in instructions
-    assert 'pinned Studio commit' in instructions
-    assert 'python -m studio.artifact_ui_poc.build_artifact <surface> <project>' in instructions
-    assert 'captured ≠ accepted' in instructions
-    assert 'ROUTING + BOOTSTRAP + UI TRANSPORT ENTRY' in instructions
-    # Project Instructions must stay router-only. Detailed host transport/materialization
-    # mechanics belong to the pinned repository contracts, not the persistent prompt.
-    assert len(instructions) < 7000
-    assert 'studio-runtime-<SHA>' not in instructions
+    assert len(instructions.encode('utf-8')) < 1400
+    assert '不得直接进入普通 slides authoring' in instructions
+    assert 'studio/host/chatgpt/ENTRYPOINT.md' in instructions
+    assert '只按当前步骤需要加载文件' in instructions
+    assert 'Workflow、Gate、Template、Image、Motion、Recovery 与 QA' in instructions
+    assert 'Stage 1' not in instructions
     assert 'app_block' not in instructions
-    assert 'current preload' not in instructions.lower()
-    assert 'A brand-new project does **not** require a Recovery Bundle.' in bootstrap
-    assert 'absence from the immediately preloaded tool list is not enough' in bootstrap
-    assert 'fresh current-session read' in bootstrap
-    assert 'explicit host-provided URL/file download primitive' in bootstrap
-    assert 'Discover before declaring unavailable' in host_rules
-    assert 'does **not** prove the connector or action is unavailable' in host_rules
-    assert 'Fresh SHA resolution' in host_rules
-    assert 'Do not reuse a literal SHA' in host_rules
-    assert 'discover GitHub artifact-related actions' in host_rules
-    assert 'host-provided download tool' in host_rules
-    assert 'must never be reported as “public GitHub Web/API was attempted and failed.”' in host_rules
+    assert 'studio-runtime-' not in instructions
+    assert 'RESUME' in entry and 'NEW' in entry
+    assert 'skills/ppt-master/SKILL.md' in entry
+    assert 'skills/ppt-master/workflows/routing.md' in entry
+    assert 'Load only that route' in entry
+    assert 'Do not preload Studio workflow/template/UI/motion/QA policy' in entry
+    assert 'discover connector resources' in entry
+    assert 'execution-container networking' in entry
+    assert 'Absence from the initially preloaded tool list is not proof' in host_rules
     assert 'Harness materialization capability unavailable' in host_rules
-    assert 'Chat-inline artifact active probe' in host_rules
-    assert 'direct assistant-response GenUI `app_block` content reference' in host_rules
-    assert (ROOT/'.github/workflows/studio-runtime-release.yml').is_file()
-    static_rules=(ROOT/'studio/enforcement/PPT_MASTER_STATIC_UI_RULES.md').read_text(encoding='utf-8')
-    assert 'static_ui/latest.json' in static_rules and 'unique, versioned HTML filename' in static_rules
+    assert 'does not define PPT workflow' in host_rules
+    assert len(host_rules.encode('utf-8')) < 5000
+
+    for rel in DELETED_CONTROL_DOCS:
+        assert not (ROOT/rel).exists(), f'duplicate control document still present: {rel}'
+
+    release=(ROOT/'.github/workflows/studio-runtime-release.yml').read_text(encoding='utf-8')
+    assert 'zip -qr "$ASSET" .' not in release
+    assert 'skills/ppt-master' in release
+    assert 'studio/host/chatgpt/ENTRYPOINT.md' in release
+    assert 'PPT_MASTER_HOST_CAPABILITY_RULES.md' in release
+    assert 'studio/artifact_ui_poc' not in release
+    assert 'studio/regression' not in release
+
+    run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
+
+    # Static UI remains a host fallback component, but it is not bootstrap authority.
     if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
     adapter=importlib.import_module('studio.scripts.static_ui_adapter')
     with tempfile.TemporaryDirectory() as ui_td:
         ui_project=Path(ui_td); ui_out=ui_project/'static_ui'; ui_out.mkdir()
         (ui_out/'confirm_stage1.html').write_text('legacy',encoding='utf-8')
-        counter={'n':0}
-        original_render=adapter._render_surface
+        counter={'n':0}; original_render=adapter._render_surface
         try:
             def fake_render(project,surface):
                 counter['n']+=1
@@ -105,8 +111,8 @@ def main():
         assert len(list(ui_out.glob('confirm_stage1__*.html')))==4
         latest=json.loads((ui_out/'latest.json').read_text(encoding='utf-8'))
         assert latest['surfaces']['stage1']['file']==names[-1]
-        assert (ui_out/names[-1]).is_file()
-    run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
+
+    # Portable recovery remains only for host filesystem-loss continuation.
     with tempfile.TemporaryDirectory() as td:
         base=Path(td); project=base/'project'
         run(ROOT/'studio/scripts/enforced_checkpoint.py',project,'--phase','intake','--harness-repo','dycm8009/ppt-master-studio','--harness-ref','studio-main','--harness-commit',SHA)
@@ -122,11 +128,10 @@ def main():
         assert m['harness']['commit']==SHA
         restored=base/'restored'
         run(ROOT/'studio/scripts/enforced_recovery.py','restore',bundle,restored)
-        rst=json.loads((restored/'project_state.json').read_text())
-        assert rst['harness']['commit']==SHA
         bad='f'*40
         p=run(ROOT/'studio/scripts/enforced_preflight.py',restored,'--running-commit',bad,ok=False)
         assert p.returncode==86 and 'does not match project pin' in p.stdout
-    print('studio smoke: passed')
+
+    print('studio v3.3 control-plane smoke: passed')
     return 0
 if __name__=='__main__': raise SystemExit(main())

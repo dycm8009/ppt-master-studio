@@ -1,48 +1,36 @@
-# PPT Master Studio Overlay
+# PPT Master Studio
 
-PPT Master Studio is a thin host/policy overlay on top of the upstream PPT Master skill.
-The fork's `main` branch remains the upstream mirror. Studio-owned behavior lives under
-`studio/` and should not be copied into upstream files unless an upstream compatibility
-fix is truly required.
+PPT Master Studio is a thin ChatGPT host adapter around the official PPT Master skill. It does not maintain a second PPT workflow.
 
-## Branch model
+## Branches
 
-- `main` — upstream mirror; do not place Studio policy here.
-- `studio-main` — stable Studio channel used by new PPT projects.
-- `studio-dev` — development channel for Studio changes and regression testing.
+- `main` — upstream mirror
+- `studio-main` — stable ChatGPT host adapter
+- `studio-dev` — development
 
-A PPT project resolves the current `studio-main` HEAD once, records the exact commit SHA
-in `project_state.json`, and stays on that commit until the user explicitly requests a
-Harness migration. "Latest" is a project-start behavior, not a mid-project behavior.
+A NEW project resolves and pins the current `studio-main` commit once. A RESUME project uses its existing pinned commit unless the user explicitly requests migration.
 
-## Host bootstrap
+## Runtime authority
 
-A NEW project is different from a RESUME project. NEW projects resolve the stable SHA
-through the connected GitHub connector, with public GitHub Web/API as fallback, and do
-not require a project Recovery Bundle.
+PPT authoring authority remains under `skills/ppt-master/`:
 
-Every stable `studio-main` commit publishes a commit-bound GitHub Runtime Release:
+- `SKILL.md` owns the official load order;
+- `workflows/routing.md` selects exactly one route;
+- the selected route owns its gates, templates, images, motion, recovery semantics and QA;
+- supporting documents are loaded only when the selected route explicitly triggers them.
 
-- tag: `studio-runtime-<SHA>`
-- asset: `ppt-master-studio-runtime-<SHA>.zip`
+Studio adds only host-specific capabilities the official skill cannot provide itself: ChatGPT/GitHub materialization and commit pinning, serverless persistence helpers, portable recovery for real filesystem loss, and an optional static confirmation transport fallback.
 
-The Runtime ZIP is an executable distribution snapshot of the Harness. It is not a
-`*.ppt-recovery.zip` and does not contain project continuation authority.
+## ChatGPT entry
 
-## Overlay responsibilities
+Persistent Project Instructions should stay minimal and point PPT tasks to:
 
-- human confirmation on serverless ChatGPT hosts through static HTML surfaces
-- portable recovery across runtime resets
-- long-deck art direction and similarity constraints
-- image semantic/template compatibility policy
-- motion budget and restrained motion defaults
-- mandatory render/deck/postflight QA policy
-- regression tests that keep those additions from drifting
+`studio/host/chatgpt/ENTRYPOINT.md`
 
-The upstream Strategist, Executor, template system, SVG/PPTX converter, animation
-registry, image acquisition, and route authorities remain upstream-owned.
+That entry point loads host materialization rules only while bootstrapping, then hands execution to the official PPT Master load order. Do not preload duplicate Studio workflow or design-policy documents.
 
-## Runtime entry
+## Runtime release
 
-Read `studio/PROJECT_BOOTSTRAP.md`. It is the canonical ChatGPT Project bootstrap
-contract. Do not use a previously uploaded Harness ZIP as a competing authority.
+Every stable `studio-main` commit publishes a commit-bound Runtime Release using tag `studio-runtime-<SHA>` and asset `ppt-master-studio-runtime-<SHA>.zip`.
+
+The Runtime is built from a whitelist: the official `skills/ppt-master` package plus minimal ChatGPT host adapters. Repository documentation, tests, regression policy and experiments are intentionally excluded. A Runtime ZIP is not a project Recovery Bundle.
