@@ -19,5 +19,7 @@ jobs:
           python-version: '3.12'
       - name: Compile artifact PoC
         run: python -m compileall studio/artifact_ui_poc
-      - name: Verify capture and handoff boundary
+      - name: Verify capture and host boundary
         run: python -m studio.artifact_ui_poc.test_contract
+      - name: Verify Gate handoff delivery boundary
+        run: python -m studio.artifact_ui_poc.test_handoff
