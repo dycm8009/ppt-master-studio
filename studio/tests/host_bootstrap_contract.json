@@ -1,8 +1,14 @@
 {
-  "schema": "ppt-master-studio-host-bootstrap-contract/v2",
+  "schema": "ppt-master-studio-host-bootstrap-contract/v3",
   "new_project_requires_recovery_bundle": false,
   "resume_requires_verified_evidence_when_state_lost": true,
-  "sha_resolution_order": ["github_connector", "public_github_web_api"],
+  "host_capability_detection_required": true,
+  "sha_resolution_order": ["github_connector", "native_web_github_api"],
+  "runtime_materialization_order": ["local_verified_runtime_bundle", "github_connector_workflow_artifact", "native_host_release_download", "native_host_exact_sha_archive"],
+  "container_network_fallback_forbidden": true,
+  "container_network_failure_counts_as_web_attempt": false,
+  "fail_closed_only_after_supported_host_paths_exhausted": true,
+  "sha_resolution_failure_must_be_distinct_from_materialization_failure": true,
   "runtime_release_tag_pattern": "studio-runtime-{commit}",
   "runtime_release_asset_pattern": "ppt-master-studio-runtime-{commit}.zip",
   "ordinary_handoff_zip_is_recovery_bundle": false

@@ -1,6 +1,6 @@
 {
   "schema": "ppt-master-studio-version/v1",
-  "studio_version": "3.2.2",
+  "studio_version": "3.2.3",
   "project_contract_version": "3.2.0",
   "upstream_skill_version": "5.0.0",
   "repository": "dycm8009/ppt-master-studio",
@@ -11,10 +11,12 @@
   "static_ui_schema": "v1",
   "recovery_schema": "ppt-master-portable-recovery/v2",
   "project_state_schema": "ppt-master-studio-project-state/v1",
-  "host_bootstrap_revision": 2,
+  "host_bootstrap_revision": 3,
   "runtime_release_tag_pattern": "studio-runtime-{commit}",
   "runtime_release_asset_pattern": "ppt-master-studio-runtime-{commit}.zip",
   "channel_policy": "new projects resolve the current studio-main HEAD then pin that exact commit for the project lifetime; recovery is only for continuation, never a prerequisite for a brand-new project",
+  "host_capability_policy": "detect actual host-exposed GitHub connector, native web, artifact/file download and local execution capabilities before choosing a bootstrap path; shell/container networking is never a substitute for native web or connector access",
+  "container_network_fallback_forbidden": true,
   "static_ui_revision": 2,
   "static_ui_history_limit": 4,
   "static_ui_filename_policy": "versioned timestamp+content-digest filenames; static_ui/latest.json points to current surface; legacy fixed HTML aliases are removed on rebuild"
