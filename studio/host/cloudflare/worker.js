@@ -1,7 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   OfficialSessionStore,
-  makeToken,
   validHostKey,
   validToken,
   reply,
@@ -63,15 +62,17 @@ async function sessionStub(env, token) {
 
 async function createHostedSession(request, env) {
   const body = await readJson(request);
-  const token = makeToken(24);
-  const hostKey = makeToken(32);
+  const token = String(body.session || '');
+  const hostKey = String(body.host_key || '');
+  if (!validToken(token)) return reply({ error: 'valid host-known session token required' }, 400);
+  if (!validHostKey(hostKey)) return reply({ error: 'valid host-known host key required' }, 400);
+
   const stub = await sessionStub(env, token);
   const result = await stub.create(body.payload, hostKey);
   if (!result?.ok) return reply({ error: result?.error || 'session create failed' }, result?.status || 400);
   return reply({
-    schema: 'ppt-master-hosted-official-session-created/v1',
+    schema: 'ppt-master-hosted-official-session-created/v2',
     session: token,
-    host_key: hostKey,
     path: `/s/${token}`,
     expires_at: result.record.expires_at,
     harness_commit: result.record.harness_commit,
@@ -142,7 +143,7 @@ async function handleOfficialApi(request, env, url) {
   return null;
 }
 
-async function serveSessionPage(request, env, url, token) {
+async function serveSessionPage(request, env, token) {
   const stub = await sessionStub(env, token);
   const state = await stub.get();
   if (!state?.ok) return reply({ error: state?.error || 'session missing or expired' }, state?.status || 404);
@@ -175,7 +176,7 @@ export default {
       }
 
       const sessionMatch = url.pathname.match(/^\/s\/([0-9a-f]{48})$/);
-      if (sessionMatch) return serveSessionPage(request, env, url, sessionMatch[1]);
+      if (sessionMatch) return serveSessionPage(request, env, sessionMatch[1]);
 
       return env.ASSETS.fetch(request);
     } catch (error) {
