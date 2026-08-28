@@ -35,15 +35,30 @@ function decodeEnvelope(encoded) {
   return value;
 }
 
-export function buildBootstrapHash(payload) {
-  return `${BOOTSTRAP_PREFIX}${encodeEnvelope({ schema: 'ppt-master-hosted-official-bootstrap-handoff/v1', payload })}`;
+function assertSession(session) {
+  if (!/^[0-9a-f]{48}$/.test(String(session || ''))) throw new Error('invalid session');
+  return String(session);
+}
+
+function assertHostKey(hostKey) {
+  if (!/^[0-9a-f]{64}$/.test(String(hostKey || ''))) throw new Error('invalid host key');
+  return String(hostKey);
+}
+
+export function buildBootstrapHash({ session, host_key, payload }) {
+  return `${BOOTSTRAP_PREFIX}${encodeEnvelope({
+    schema: 'ppt-master-hosted-official-bootstrap-handoff/v2',
+    session: assertSession(session),
+    host_key: assertHostKey(host_key),
+    payload,
+  })}`;
 }
 
 export function buildAdvanceHash({ session, host_key, api_snapshot }) {
   return `${ADVANCE_PREFIX}${encodeEnvelope({
     schema: 'ppt-master-hosted-official-advance-handoff/v1',
-    session,
-    host_key,
+    session: assertSession(session),
+    host_key: assertHostKey(host_key),
     api_snapshot,
   })}`;
 }
@@ -52,13 +67,23 @@ function decodeCurrentHash(hash) {
   const text = String(hash || '');
   if (text.startsWith(BOOTSTRAP_PREFIX)) {
     const value = decodeEnvelope(text.slice(BOOTSTRAP_PREFIX.length));
-    if (value.schema !== 'ppt-master-hosted-official-bootstrap-handoff/v1') throw new Error('unsupported bootstrap handoff');
-    return { kind: 'bootstrap', ...value };
+    if (value.schema !== 'ppt-master-hosted-official-bootstrap-handoff/v2') throw new Error('unsupported bootstrap handoff');
+    return {
+      kind: 'bootstrap',
+      ...value,
+      session: assertSession(value.session),
+      host_key: assertHostKey(value.host_key),
+    };
   }
   if (text.startsWith(ADVANCE_PREFIX)) {
     const value = decodeEnvelope(text.slice(ADVANCE_PREFIX.length));
     if (value.schema !== 'ppt-master-hosted-official-advance-handoff/v1') throw new Error('unsupported advance handoff');
-    return { kind: 'advance', ...value };
+    return {
+      kind: 'advance',
+      ...value,
+      session: assertSession(value.session),
+      host_key: assertHostKey(value.host_key),
+    };
   }
   return null;
 }
@@ -79,18 +104,22 @@ export async function runBootstrapPage() {
   try {
     const handoff = decodeCurrentHash(location.hash);
     if (!handoff) throw new Error('PPT Master hosted handoff is missing');
+    // The handoff carries bearer material. Erase it before any network request.
     history.replaceState(null, '', location.pathname + location.search);
 
     if (handoff.kind === 'bootstrap') {
       status.textContent = 'Creating hosted Confirm UI session…';
-      const created = await postJson('/api/sessions', { payload: handoff.payload });
-      sessionStorage.setItem(`ppt-master-host-key:${created.session}`, created.host_key);
+      const created = await postJson('/api/sessions', {
+        session: handoff.session,
+        host_key: handoff.host_key,
+        payload: handoff.payload,
+      });
+      if (created.session !== handoff.session) throw new Error('hosted session id mismatch');
+      sessionStorage.setItem(`ppt-master-host-key:${created.session}`, handoff.host_key);
       location.replace(created.path);
       return;
     }
 
-    if (!/^[0-9a-f]{48}$/.test(handoff.session || '')) throw new Error('invalid session');
-    if (!/^[0-9a-f]{64}$/.test(handoff.host_key || '')) throw new Error('invalid host key');
     status.textContent = 'Updating the existing session with Stage 2…';
     await postJson(`/api/sessions/${handoff.session}/advance`, { api_snapshot: handoff.api_snapshot }, {
       'x-ppt-master-host-key': handoff.host_key,
