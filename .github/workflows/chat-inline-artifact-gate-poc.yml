@@ -23,3 +23,5 @@ jobs:
         run: python -m studio.artifact_ui_poc.test_contract
       - name: Verify Gate handoff delivery boundary
         run: python -m studio.artifact_ui_poc.test_handoff
+      - name: Verify host adapter state machine
+        run: python -m studio.artifact_ui_poc.test_adapter
