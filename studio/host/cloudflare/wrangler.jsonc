@@ -7,7 +7,14 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/s/*"]
+    "run_worker_first": [
+      "/api/*",
+      "/s/*",
+      "/e/*",
+      "/images/*",
+      "/assets/*",
+      "/accept/*"
+    ]
   },
   "durable_objects": {
     "bindings": [
