@@ -32,10 +32,13 @@ Load Studio host adapters only when their condition occurs:
 
 - checkpoint/preflight: project pin or resume verification;
 - portable recovery: local project state was actually lost on a continuation run;
-- static UI adapter: only when the active official confirmation flow needs a host fallback that cannot use its normal page/chat channel.
+- Interactive Code Block mini app: only when the active official confirmation flow needs user interaction and this ChatGPT conversation exposes supported HTML/React Preview;
+- static UI adapter: only when the active official confirmation flow needs a host fallback that cannot use its normal page/chat channel or supported mini-app Preview.
 
 A host adapter may change transport or persistence, but must not invent a second PPT workflow, schema, design policy, motion policy, or QA authority.
 
-**Human-confirmation invariant:** a confirmation-surface failure may change only the transport, never the owner of the decision. Unless the user has explicitly delegated that confirmation, switching from Confirm UI/page to chat is a blocking human gate: present the current official Gate's unresolved confirmation items in chat, wait for an explicit user confirmation or revision, and only then persist/submit the confirmation and continue. A fallback notice, recommendation summary, silence, or assistant-authored choice is not user confirmation. Preserve any already-persisted valid receipt exactly as the official route requires.
+**Mini-app transport:** when supported code-block Preview is available, `studio/scripts/mini_app_builder.py` may render the current official Gate data into one self-contained HTML code block. Surface that fenced `html` block directly in the assistant response so ChatGPT can offer Code/Preview. Do not serialize raw `app_block`/GenUI markers and do not attach the HTML as a substitute for the code block. The mini app may collect local UI state and emit a structured confirmation payload, but it must not assume an undocumented automatic callback from Preview to the assistant; until a host-native callback is actually available, the user returns the generated confirmation payload in chat.
+
+**Human-confirmation invariant:** a confirmation-surface failure may change only the transport, never the owner of the decision. Unless the user has explicitly delegated that confirmation, switching from Confirm UI/page/mini app to chat is a blocking human gate: present the current official Gate's unresolved confirmation items in chat, wait for an explicit user confirmation or revision, and only then persist/submit the confirmation and continue. A fallback notice, recommendation summary, silence, or assistant-authored choice is not user confirmation. Preserve any already-persisted valid receipt exactly as the official route requires.
 
 If required bootstrap material cannot be resolved or materialized after the supported host paths are genuinely exhausted, fail closed. Never fall back to generic slide authoring.
