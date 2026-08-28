@@ -1,0 +1,26 @@
+{
+  "schema": "ppt-master-chat-inline-artifact-host-capabilities/v1",
+  "host_surface": "chat-inline-interactive-ui-artifact",
+  "verified": {
+    "embedded_render": true,
+    "local_form_state": true,
+    "local_javascript_events": true,
+    "local_reactive_preview": true,
+    "local_undo_reset_possible": true,
+    "canonical_payload_can_be_constructed_locally": true,
+    "assistant_turn_can_remain_suspended_waiting_for_ui": false,
+    "artifact_can_submit_payload_to_assistant": false,
+    "artifact_can_call_harness_tool": false,
+    "artifact_can_trigger_next_assistant_turn": false
+  },
+  "authority": {
+    "artifact_confirm_status": "captured",
+    "artifact_confirm_is_accepted": false,
+    "accepted_receipt_creator": "studio/scripts/static_ui_adapter.py validate"
+  },
+  "blocked_gate": "host_handoff",
+  "notes": [
+    "Do not substitute Sites, MCP Apps, external domains, or standalone browser pages for this experiment.",
+    "A future supported host bridge should transport an already-frozen canonical envelope; it must not create accepted receipts."
+  ]
+}
