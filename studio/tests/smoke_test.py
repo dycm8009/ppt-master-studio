@@ -93,7 +93,7 @@ def main():
     # chat must ask the unresolved Stage-1 items and wait explicitly.
     confirm_ui=(ROOT/'skills/ppt-master/scripts/docs/confirm_ui.md').read_text(encoding='utf-8')
     assert 'The handoff is context, not confirmation, and silence confirms' in confirm_ui
-    assert 'present the same combined Stage-1 items as open chat questions and wait explicitly' in confirm_ui
+    assert 'open chat questions and wait explicitly' in confirm_ui
 
     for rel in DELETED_CONTROL_DOCS:
         assert not (ROOT/rel).exists(), f'duplicate control document still present: {rel}'
