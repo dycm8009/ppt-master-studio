@@ -1,13 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ppt-master-hosted-confirm",
-  "main": "worker_prod.js",
-  "compatibility_date": "2026-08-28",
+  "main": "worker_production.js",
+  "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/s/*", "/e/*", "/images/*", "/assets/*", "/accept/*"]
+    "run_worker_first": ["/api/*", "/s/*", "/e/*", "/images/*", "/assets/*"]
   },
   "durable_objects": {
     "bindings": [
