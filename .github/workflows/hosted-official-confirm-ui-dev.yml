@@ -1,4 +1,4 @@
-name: Hosted Official Confirm UI Dev
+name: Hosted Official UI Dev
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'studio/host/cloudflare/**'
       - 'skills/ppt-master/scripts/confirm_ui/**'
+      - 'skills/ppt-master/scripts/svg_editor/**'
       - 'skills/ppt-master/templates/icons/**'
       - 'skills/ppt-master/references/ai-image-comparison/**'
       - '.github/workflows/hosted-official-confirm-ui-dev.yml'
@@ -18,10 +19,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install Cloudflare dev dependencies
+      - name: Install Cloudflare dependencies
         working-directory: studio/host/cloudflare
         run: npm install --no-audit --no-fund
-      - name: Build pinned official Confirm UI assets
+      - name: Build pinned official UI assets
         working-directory: studio/host/cloudflare
         run: npm run build
       - name: Check official frontend/API drift
@@ -30,6 +31,9 @@ jobs:
       - name: Test hosted Stage 1 -> Stage 2 lifecycle
         working-directory: studio/host/cloudflare
         run: node test_hosted_official.mjs
+      - name: Test hosted official SVG Editor lifecycle
+        working-directory: studio/host/cloudflare
+        run: node test_hosted_editor.mjs
       - name: Wrangler bundle dry-run
         working-directory: studio/host/cloudflare
         run: npx wrangler deploy --dry-run --config wrangler.jsonc
