@@ -39,6 +39,7 @@ jobs:
           python -m studio.artifact_ui_poc.test_stage2_parity
           python -m studio.artifact_ui_poc.test_motion_parity
           python -m studio.artifact_ui_poc.test_package
+          python -m studio.artifact_ui_poc.test_render_contract
       - name: Install Hosted UI POC dependencies
         working-directory: studio/hosted_ui_poc
         run: npm install --no-audit --no-fund
