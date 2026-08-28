@@ -1,42 +1,9 @@
 (function () {
   'use strict';
 
-  const CAPTURE_PREFIX = '#ppt-master-official-captured=';
-  const MAX_HANDOFF_BYTES = 131072;
   const tokenMatch = location.pathname.match(/^\/s\/([0-9a-f]{48})$/);
   const session = tokenMatch ? tokenMatch[1] : null;
   if (!session) return;
-
-  function encodeBase64UrlUtf8(text) {
-    const bytes = new TextEncoder().encode(text);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += 0x4000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x4000));
-    }
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-
-  function encodeEnvelope(value) {
-    const json = JSON.stringify(value);
-    const size = new TextEncoder().encode(json).byteLength;
-    if (size > MAX_HANDOFF_BYTES) throw new Error(`capture handoff exceeds ${MAX_HANDOFF_BYTES} bytes`);
-    return encodeBase64UrlUtf8(json);
-  }
-
-  function captureHash(payload) {
-    const stage = payload && payload.stage === 'stage1' ? 'stage1' : 'stage2';
-    const hostKey = sessionStorage.getItem(`ppt-master-host-key:${session}`) || null;
-    return `${CAPTURE_PREFIX}${encodeEnvelope({
-      schema: 'ppt-master-hosted-official-browser-capture/v1',
-      status: 'captured-not-validated',
-      harness_status: 'not-validated',
-      session,
-      host_key: hostKey,
-      stage,
-      response: payload,
-      captured_at: new Date().toISOString(),
-    })}`;
-  }
 
   function showHandoff(stage) {
     let bar = document.getElementById('ppt-master-hosted-handoff');
@@ -60,8 +27,8 @@
       document.body.appendChild(bar);
     }
     bar.textContent = stage === 'stage1'
-      ? 'Stage 1 已捕获。请返回聊天，让 PPT Master Harness 验证并准备 Stage 2；此页面会保留当前 session。'
-      : 'Stage 2 已捕获。请返回聊天，让 PPT Master Harness 完成最终验证并继续。';
+      ? 'Stage 1 已捕获。请返回聊天，让 PPT Master Harness 获取并验证当前 session 的响应，再准备 Stage 2；此页面会保留当前 session。'
+      : 'Stage 2 已捕获。请返回聊天，让 PPT Master Harness 获取并验证当前 session 的响应后继续。';
   }
 
   const nativeFetch = window.fetch.bind(window);
@@ -76,10 +43,13 @@
         if (!body && input instanceof Request) body = await input.clone().text();
         const payload = typeof body === 'string' ? JSON.parse(body) : body;
         const stage = payload && payload.stage === 'stage1' ? 'stage1' : 'stage2';
-        history.replaceState(null, '', location.pathname + location.search + captureHash(payload));
+        // The Durable Object is the capture transport.  Keep the visible URL at
+        // the short /s/<session> path instead of serializing the response into
+        // a second browser fragment; the Host already knows this session token.
+        history.replaceState(null, '', location.pathname + location.search);
         showHandoff(stage);
       } catch (error) {
-        console.error('PPT Master hosted capture handoff failed:', error);
+        console.error('PPT Master hosted capture notice failed:', error);
       }
     }
     return response;
