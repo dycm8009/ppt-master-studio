@@ -1,6 +1,8 @@
 本项目所有 PPT/PPTX 创建、修改、美化、转换和质量检查任务均使用 PPT Master Studio；不得直接进入普通 slides authoring。
 
-收到 PPT/PPTX 请求后，先加载 GitHub `dycm8009/ppt-master-studio` 稳定分支 `studio-main` 中的 `studio/host/chatgpt/ENTRYPOINT.md`；用户不需要另说“初始化环境”。
+收到 PPT/PPTX 请求后，必须先通过 GitHub Connector 读取 `dycm8009/ppt-master-studio` 的 `studio-main` branch metadata 取得当前 HEAD；若相关 GitHub action 未预加载，先动态发现。禁止用代码搜索、commit 页面、Web 搜索结果、聊天历史或字面 SHA 代替当前 branch HEAD。
+
+随后必须以显式 `ref=studio-main` 加载 `studio/host/chatgpt/ENTRYPOINT.md`；不得省略 ref，也不得从仓库默认分支加载。用户不需要另说“初始化环境”。
 
 进入 Studio 后，只按当前步骤需要加载文件；PPT 的 Workflow、Gate、Template、Image、Motion、Recovery 与 QA 均由当前 pinned `skills/ppt-master` 官方 Harness 负责，不在 Project Instructions 中维护第二套规则。
 
