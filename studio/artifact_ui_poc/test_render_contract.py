@@ -17,25 +17,41 @@ def main() -> int:
     assert probe["build_artifact_before_static_ui_fallback"] is True
     assert probe["fallback_only_on_explicit_unavailability_or_render_failure"] is True
     assert probe["render_contract"] == "studio/artifact_ui_poc/CHATGPT_RENDER_CONTRACT.md"
+    assert probe["response_transport"] == "direct-genui-app-block-content-reference"
+    assert probe["transport_contract"] == "studio/artifact_ui_poc/CHATGPT_DIRECT_CONTENT_REFERENCE.md"
+    assert probe["tool_discovery_required_for_render"] is False
+    assert probe["tool_list_absence_is_unavailability_evidence"] is False
 
     contract = (ROOT / "CHATGPT_RENDER_CONTRACT.md").read_text(encoding="utf-8")
     assert "first inline render attempt is the capability probe" in contract
-    assert 'app_block.entrypoint    = "index.html"' in contract
+    assert 'app_block.entrypoint     = "index.html"' in contract
     assert "app_block.bundle_version = 1" in contract
-    assert "Do not choose Static UI merely because" in contract
+    assert 'genui{"app_block":' in contract
+    assert "do **not** require an `app_block` tool to be preloaded" in contract
+    assert "absence from the tool list" in contract
     assert "HTML attachment" in contract
+
+    direct = (ROOT / "CHATGPT_DIRECT_CONTENT_REFERENCE.md").read_text(encoding="utf-8")
+    assert 'genui{"app_block":' in direct
+    assert "not a normal tool call" in direct
+    assert "Absence from the tool/action list is **not** evidence" in direct
+    assert "Do not claim `current host has no inline app_block interface`" in direct
 
     project_instructions = (STUDIO / "CHATGPT_PROJECT_INSTRUCTIONS.txt").read_text(encoding="utf-8")
     assert "artifact-first active probe" in project_instructions
-    assert "渲染尝试本身就是本会话的 host capability probe" in project_instructions
-    assert "不得因为“这是新聊天”" in project_instructions
+    assert "direct response content reference 本身就是本会话 host capability probe" in project_instructions
+    assert 'genui{"app_block":' in project_instructions
+    assert "工具列表里没有 `app_block`" in project_instructions
+    assert "仅仅看不到 `app_block` tool/action 不是 fallback 证据" in project_instructions
     assert "缺少 callback 只影响 handoff" in project_instructions
-    assert "不得仅因为当前聊天缺少历史 host 验证而 fallback" in project_instructions
 
     host_rules = (STUDIO / "enforcement" / "PPT_MASTER_HOST_CAPABILITY_RULES.md").read_text(encoding="utf-8")
     assert "## 8. Chat-inline artifact active probe" in host_rules
+    assert 'genui{"app_block":' in host_rules
+    assert "response-serialization capability" in host_rules
     assert "Do **not** require a previous chat" in host_rules
-    assert "Do **not** pre-build or present Static UI HTML" in host_rules
+    assert "absence of an `app_block` tool/action" in host_rules
+    assert "Never classify `current host has no inline app_block interface`" in host_rules
 
     return 0
 
