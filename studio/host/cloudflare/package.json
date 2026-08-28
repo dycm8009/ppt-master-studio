@@ -1,0 +1,14 @@
+{
+  "name": "ppt-master-hosted-official-confirm-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build_assets.mjs",
+    "test:contract": "node test_official_confirm_ui_contract.mjs",
+    "test": "npm run build && npm run test:contract && node test_hosted_official.mjs",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
