@@ -1,0 +1,52 @@
+name: Hosted Official UI Deploy Production
+
+on:
+  push:
+    branches: [studio-main]
+    paths:
+      - 'studio/host/cloudflare/**'
+      - 'skills/ppt-master/scripts/confirm_ui/**'
+      - 'skills/ppt-master/scripts/svg_editor/**'
+      - 'skills/ppt-master/templates/icons/**'
+      - 'skills/ppt-master/references/ai-image-comparison/**'
+      - '.github/workflows/hosted-official-ui-deploy-prod.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require Cloudflare deployment credentials
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CF_API_TOKEN"
+          test -n "$CF_ACCOUNT_ID"
+      - name: Install dependencies
+        working-directory: studio/host/cloudflare
+        run: npm install --no-audit --no-fund
+      - name: Build pinned official UI assets
+        working-directory: studio/host/cloudflare
+        run: npm run build
+      - name: Validate contracts and transport
+        working-directory: studio/host/cloudflare
+        run: |
+          npm run test:contract
+          node test_hosted_official.mjs
+          node test_hosted_editor.mjs
+          python test_confirm_handoff.py
+          python -m py_compile hosted_confirm_handoff.py hosted_editor_bridge.py
+          npx wrangler deploy --dry-run --config wrangler.prod.jsonc
+      - name: Deploy production Hosted UI
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: studio/host/cloudflare
+          wranglerVersion: '4.115.0'
+          command: deploy --config wrangler.prod.jsonc
