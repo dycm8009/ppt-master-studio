@@ -27,3 +27,5 @@ jobs:
         run: python -m studio.artifact_ui_poc.test_adapter
       - name: Verify real Stage 1 and Deck Review project models
         run: python -m studio.artifact_ui_poc.test_project_models
+      - name: Verify real Stage 1 and Deck Review renderer fragments
+        run: python -m studio.artifact_ui_poc.test_renderer
