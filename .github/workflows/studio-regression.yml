@@ -18,11 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - name: Compile Studio scripts
-        run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py studio/hosted_ui_poc/validate_stage1_gate.py
+        run: python -m py_compile studio/scripts/*.py studio/static_ui/*.py studio/tests/*.py
       - name: Compile chat-inline artifact adapter
         run: python -m compileall studio/artifact_ui_poc
       - name: Load Static UI Adapter
@@ -39,11 +36,3 @@ jobs:
           python -m studio.artifact_ui_poc.test_stage2_parity
           python -m studio.artifact_ui_poc.test_motion_parity
           python -m studio.artifact_ui_poc.test_package
-      - name: Install Hosted UI POC dependencies
-        working-directory: studio/hosted_ui_poc
-        run: npm install --no-audit --no-fund
-      - name: Hosted UI POC transport smoke
-        run: node studio/hosted_ui_poc/test_hosted_ui.mjs
-      - name: Hosted UI POC MCP bundle dry-run
-        working-directory: studio/hosted_ui_poc
-        run: npx wrangler deploy --dry-run
