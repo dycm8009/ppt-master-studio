@@ -25,6 +25,8 @@ jobs:
         run: python studio/scripts/static_ui_adapter.py --help
       - name: Studio control-plane smoke tests
         run: python studio/tests/smoke_test.py
+      - name: Stage 1 mini-app integration tests
+        run: python studio/tests/stage1_mini_app_test.py
       - name: Runtime whitelist smoke
         shell: bash
         run: |
@@ -39,6 +41,8 @@ jobs:
             studio/scripts/enforced_checkpoint.py \
             studio/scripts/enforced_preflight.py \
             studio/scripts/enforced_recovery.py \
+            studio/scripts/mini_app_builder.py \
+            studio/scripts/stage1_mini_app.py \
             studio/scripts/static_ui_adapter.py \
             studio/static_ui
           python - "$ZIP" <<'PY'
@@ -48,6 +52,8 @@ jobs:
           assert 'skills/ppt-master/SKILL.md' in names
           assert 'studio/host/chatgpt/ENTRYPOINT.md' in names
           assert 'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md' in names
+          assert 'studio/scripts/mini_app_builder.py' in names
+          assert 'studio/scripts/stage1_mini_app.py' in names
           forbidden=('studio/artifact_ui_poc/','studio/regression/','studio/tests/','studio/PROJECT_BOOTSTRAP.md','studio/enforcement/PPT_MASTER_WORKFLOW.md')
           assert not any(any(n.startswith(prefix) for prefix in forbidden) for n in names)
           print(f'runtime whitelist: passed ({len(names)} entries)')
