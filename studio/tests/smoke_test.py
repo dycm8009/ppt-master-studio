@@ -142,6 +142,13 @@ def main() -> int:
     assert hosted['motion_review_surface'] is False
     assert 'pinned 40-hex Harness commit' in hosted['pinned_asset_policy']
 
+    # Every stable commit is a possible NEW-project pin, so every push to studio-main
+    # must deploy its own immutable Hosted UI Worker even when UI source files did not change.
+    deploy = (ROOT / '.github/workflows/hosted-official-ui-deploy-prod.yml').read_text(encoding='utf-8')
+    deploy_trigger = deploy.split('\njobs:', 1)[0]
+    assert 'branches: [studio-main]' in deploy_trigger
+    assert '\n    paths:' not in deploy_trigger
+
     # The resolver must bind the browser surface to the exact project pin.
     resolved = run(ROOT / 'studio/host/cloudflare/hosted_url.py', SHA).stdout.strip()
     assert resolved == f'https://ppt-master-hosted-{SHA[:12]}.dycm-lab.workers.dev'
