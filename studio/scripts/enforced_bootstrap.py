@@ -19,7 +19,7 @@ REQUIRED = [
     'studio/scripts/enforced_recovery.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
-STUDIO_VERSION = '3.3.1'
+STUDIO_VERSION = '3.3.2'
 PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
@@ -50,7 +50,7 @@ def main():
     if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
     if int(version.get('host_bootstrap_revision') or 0) < 6: errors.append('VERSION.json host_bootstrap_revision must be >= 6')
     if int(version.get('project_router_revision') or 0) < 2: errors.append('VERSION.json project_router_revision must be >= 2')
-    if int(version.get('control_plane_revision') or 0) < 2: errors.append('VERSION.json control_plane_revision must be >= 2')
+    if int(version.get('control_plane_revision') or 0) < 3: errors.append('VERSION.json control_plane_revision must be >= 3')
     if version.get('connector_discovery_required') is not True: errors.append('VERSION.json must require connector discovery')
     if version.get('preloaded_tool_absence_is_connector_unavailable') is not False: errors.append('VERSION.json must not equate preloaded-tool absence with connector unavailability')
     if version.get('fresh_sha_resolution_required') is not True: errors.append('VERSION.json must require fresh SHA resolution')
@@ -71,6 +71,7 @@ def main():
         'host_bootstrap_revision':version.get('host_bootstrap_revision'),
         'project_router_revision':version.get('project_router_revision'),
         'control_plane_revision':version.get('control_plane_revision'),
+        'mini_app_transport_revision':version.get('mini_app_transport_revision'),
         'status':status,
         'missing':missing,
         'errors':errors,

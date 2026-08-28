@@ -27,17 +27,21 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.3.1'
+    assert v['studio_version']=='3.3.2'
     assert v['project_contract_version']=='3.2.0'
     assert v['host_bootstrap_revision']>=6
     assert v['project_router_revision']>=2
-    assert v['control_plane_revision']>=2
+    assert v['control_plane_revision']>=3
+    assert v['mini_app_transport_revision']>=1
     assert 'host adapter only' in v['control_plane_policy']
     assert 'minimal PPT-to-Studio routing contract' in v['project_router_policy']
     assert 'Load only' in v['lazy_load_policy']
     assert 'whitelist' in v['runtime_bundle_policy']
     assert 'never decision ownership' in v['human_confirmation_fallback_policy']
     assert 'wait for explicit user confirmation or revision' in v['human_confirmation_fallback_policy']
+    assert 'code-block Preview' in v['mini_app_transport_policy']
+    assert 'must not redefine the official Gate schema' in v['mini_app_transport_policy']
+    assert 'must not assume an undocumented automatic callback' in v['mini_app_transport_policy']
     assert v['connector_discovery_required'] is True
     assert v['preloaded_tool_absence_is_connector_unavailable'] is False
     assert v['fresh_sha_resolution_required'] is True
@@ -62,6 +66,16 @@ def main():
     assert contract['assistant_recommendation_counts_as_confirmation'] is False
     assert contract['silence_counts_as_confirmation'] is False
 
+    mini_contract=json.loads((ROOT/'studio/tests/mini_app_transport_contract.json').read_text())
+    assert mini_contract['schema']=='ppt-master-studio-mini-app-transport-contract/v1'
+    assert mini_contract['transport']=='chatgpt_interactive_code_block_preview'
+    assert mini_contract['raw_app_block_or_genui_marker_allowed'] is False
+    assert mini_contract['adapter_may_redefine_official_gate_schema'] is False
+    assert mini_contract['external_network_required'] is False
+    assert mini_contract['automatic_preview_to_assistant_callback_assumed'] is False
+    assert mini_contract['poc_confirmation_return_channel']=='user_returns_generated_json_in_chat'
+    assert mini_contract['static_html_attachment_is_mini_app_transport'] is False
+
     instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
     entry=(ROOT/'studio/host/chatgpt/ENTRYPOINT.md').read_text(encoding='utf-8')
     host_rules=(ROOT/'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md').read_text(encoding='utf-8')
@@ -80,6 +94,11 @@ def main():
     assert 'Do not preload Studio workflow/template/UI/motion/QA policy' in entry
     assert 'discover connector resources' in entry
     assert 'execution-container networking' in entry
+    assert 'Interactive Code Block mini app' in entry
+    assert 'mini_app_builder.py' in entry
+    assert 'one self-contained HTML code block' in entry
+    assert 'Do not serialize raw `app_block`/GenUI markers' in entry
+    assert 'must not assume an undocumented automatic callback' in entry
     assert 'Human-confirmation invariant' in entry
     assert 'change only the transport, never the owner of the decision' in entry
     assert 'wait for an explicit user confirmation or revision' in entry
@@ -103,10 +122,28 @@ def main():
     assert 'skills/ppt-master' in release
     assert 'studio/host/chatgpt/ENTRYPOINT.md' in release
     assert 'PPT_MASTER_HOST_CAPABILITY_RULES.md' in release
+    assert 'studio/scripts/mini_app_builder.py' in release
     assert 'studio/artifact_ui_poc' not in release
     assert 'studio/regression' not in release
 
     run(ROOT/'studio/scripts/enforced_bootstrap.py','--repo-root',ROOT,'--running-commit',SHA)
+
+    # Interactive Code Block mini app POC: self-contained HTML, no external
+    # transport marker, local interaction, and explicit structured result.
+    with tempfile.TemporaryDirectory() as mini_td:
+        mini_path=Path(mini_td)/'stage1_poc.html'
+        run(ROOT/'studio/scripts/mini_app_builder.py','sample','--output',mini_path)
+        mini=mini_path.read_text(encoding='utf-8')
+        assert '<!doctype html>' in mini
+        assert 'PPT Master Studio · Mini App POC' in mini
+        assert 'data-field="audience"' in mini
+        assert 'ppt-master-studio-mini-app-response/v1' in mini
+        assert 'navigator.clipboard.writeText' in mini
+        assert 'automatic callback' in mini
+        assert 'app_block' not in mini
+        assert '<script src=' not in mini and '<link rel=' not in mini
+        block=run(ROOT/'studio/scripts/mini_app_builder.py','sample','--code-block').stdout
+        assert block.startswith('```html\n<!doctype html>') and block.rstrip().endswith('```')
 
     # Static UI remains a host fallback component, but it is not bootstrap authority.
     if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
@@ -149,6 +186,6 @@ def main():
         p=run(ROOT/'studio/scripts/enforced_preflight.py',restored,'--running-commit',bad,ok=False)
         assert p.returncode==86 and 'does not match project pin' in p.stdout
 
-    print('studio v3.3.1 control-plane smoke: passed')
+    print('studio v3.3.2 mini-app transport smoke: passed')
     return 0
 if __name__=='__main__': raise SystemExit(main())
