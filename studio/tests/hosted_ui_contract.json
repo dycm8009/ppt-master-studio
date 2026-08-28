@@ -1,0 +1,18 @@
+{
+  "schema": "ppt-master-studio-hosted-ui-contract/v1",
+  "primary_confirmation_transport": "cloudflare_hosted_official_confirm_ui",
+  "executor_review_transport": "cloudflare_hosted_official_svg_editor",
+  "motion_review_surface": false,
+  "official_frontend_assets_are_copied_unmodified": true,
+  "studio_may_redefine_official_gate_schema": false,
+  "hosted_capture_is_harness_validation": false,
+  "confirm_authority": "local_pinned_official_confirm_ui",
+  "svg_editor_authority": "local_pinned_official_svg_editor",
+  "immutable_worker_is_bound_to_pinned_harness_commit": true,
+  "confirm_browser_handoff_can_operate_without_container_outbound_https": true,
+  "confirm_capture_can_be_fetched_by_host_native_web_get": true,
+  "hosted_svg_editor_requires_runtime_outbound_https_for_project_sync": true,
+  "container_network_failure_must_not_be_reported_as_host_web_failure": true,
+  "mini_app_is_primary_confirmation_transport": false,
+  "acceptance_routes_allowed_on_production_entrypoint": false
+}
