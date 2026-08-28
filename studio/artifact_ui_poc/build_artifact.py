@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from .adapter import ArtifactHostProfile, plan_artifact_gate
+from .copy_handoff import add_copy_and_continue
+from .motion_parity import motion_review_artifact_fragment, motion_review_artifact_model
 from .project_models import deck_review_artifact_model, stage1_artifact_model
 from .renderer import deck_review_artifact_fragment, stage1_artifact_fragment
 from .stage2_parity import stage2_artifact_fragment, stage2_artifact_model
@@ -35,8 +37,14 @@ def build_artifact_package(
         model = deck_review_artifact_model(project)
         content = deck_review_artifact_fragment(model)
         title = "PPT Master · Deck Review"
+    elif surface == "motion-review":
+        model = motion_review_artifact_model(project)
+        content = motion_review_artifact_fragment(model)
+        title = "PPT Master · Motion Review"
     else:
         raise ValueError(f"unsupported artifact surface: {surface}")
+
+    content = add_copy_and_continue(content, surface)
 
     return {
         "schema": "ppt-master-chat-inline-artifact-package/v1",
@@ -55,13 +63,14 @@ def build_artifact_package(
             "capture_is_accepted": False,
             "validator": "studio/scripts/static_ui_adapter.py validate",
             "accepted_receipt_required": True,
+            "manual_handoff": "copy-paste-canonical-json",
         },
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build a PPT Master chat-inline artifact package")
-    parser.add_argument("surface", choices=("stage1", "stage2", "deck-review"))
+    parser.add_argument("surface", choices=("stage1", "stage2", "deck-review", "motion-review"))
     parser.add_argument("project", type=Path)
     parser.add_argument("--format", choices=("package", "html", "model"), default="package")
     parser.add_argument("--output", type=Path)
