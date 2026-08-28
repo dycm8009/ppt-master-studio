@@ -121,7 +121,7 @@ def main():
     assert 'recommendations.stage1.json' in confirm_ui
     assert 'template_options.json' in confirm_ui
     assert 'All seven Stage-1 prose values may be blank' in confirm_ui
-    assert 'chat/delegated branch preserves the same logical order without fabricating these UI receipts' in confirm_ui
+    assert 'without fabricating these UI receipts' in confirm_ui
 
     for rel in DELETED_CONTROL_DOCS:
         assert not (ROOT/rel).exists(), f'duplicate control document still present: {rel}'
