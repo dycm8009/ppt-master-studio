@@ -31,5 +31,7 @@ jobs:
         run: python -m studio.artifact_ui_poc.test_renderer
       - name: Verify Stage 2 official parity
         run: python -m studio.artifact_ui_poc.test_stage2_parity
-      - name: Verify host-ready artifact packages
+      - name: Verify Motion Review official parity
+        run: python -m studio.artifact_ui_poc.test_motion_parity
+      - name: Verify host-ready artifact packages and copy handoff
         run: python -m studio.artifact_ui_poc.test_package
