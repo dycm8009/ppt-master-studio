@@ -1,0 +1,37 @@
+name: Chat Inline Artifact Gate POC
+
+on:
+  push:
+    branches:
+      - feature/chat-inline-artifact-gate-poc
+    paths:
+      - 'studio/artifact_ui_poc/**'
+      - '.github/workflows/chat-inline-artifact-gate-poc.yml'
+  workflow_dispatch:
+
+jobs:
+  artifact-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile artifact PoC
+        run: python -m compileall studio/artifact_ui_poc
+      - name: Verify capture and host boundary
+        run: python -m studio.artifact_ui_poc.test_contract
+      - name: Verify Gate handoff delivery boundary
+        run: python -m studio.artifact_ui_poc.test_handoff
+      - name: Verify host adapter state machine
+        run: python -m studio.artifact_ui_poc.test_adapter
+      - name: Verify real Stage 1 and Deck Review project models
+        run: python -m studio.artifact_ui_poc.test_project_models
+      - name: Verify real Stage 1 and Deck Review renderer fragments
+        run: python -m studio.artifact_ui_poc.test_renderer
+      - name: Verify Stage 2 official parity
+        run: python -m studio.artifact_ui_poc.test_stage2_parity
+      - name: Verify Motion Review official parity
+        run: python -m studio.artifact_ui_poc.test_motion_parity
+      - name: Verify host-ready artifact packages and copy handoff
+        run: python -m studio.artifact_ui_poc.test_package
