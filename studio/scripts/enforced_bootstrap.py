@@ -28,7 +28,7 @@ REQUIRED = [
     'studio/scripts/enforced_recovery.py',
 ]
 HEX40 = re.compile(r'^[0-9a-f]{40}$')
-STUDIO_VERSION = '3.2.4'
+STUDIO_VERSION = '3.2.5'
 PROJECT_CONTRACT_VERSION = '3.2.0'
 
 def git_head(root: Path) -> str | None:
@@ -57,7 +57,7 @@ def main():
     if version.get('repository')!='dycm8009/ppt-master-studio': errors.append('VERSION.json repository mismatch')
     if version.get('studio_version')!=STUDIO_VERSION: errors.append('VERSION.json studio_version mismatch')
     if version.get('project_contract_version')!=PROJECT_CONTRACT_VERSION: errors.append('VERSION.json project_contract_version mismatch')
-    if int(version.get('host_bootstrap_revision') or 0) < 4: errors.append('VERSION.json host_bootstrap_revision must be >= 4')
+    if int(version.get('host_bootstrap_revision') or 0) < 5: errors.append('VERSION.json host_bootstrap_revision must be >= 5')
     if version.get('connector_discovery_required') is not True: errors.append('VERSION.json must require connector discovery')
     if version.get('preloaded_tool_absence_is_connector_unavailable') is not False: errors.append('VERSION.json must not equate preloaded-tool absence with connector unavailability')
     if version.get('fresh_sha_resolution_required') is not True: errors.append('VERSION.json must require fresh SHA resolution')
