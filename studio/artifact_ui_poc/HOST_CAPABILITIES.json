@@ -7,6 +7,10 @@
     "prior_chat_evidence_required": false,
     "build_artifact_before_static_ui_fallback": true,
     "render_contract": "studio/artifact_ui_poc/CHATGPT_RENDER_CONTRACT.md",
+    "response_transport": "direct-genui-app-block-content-reference",
+    "transport_contract": "studio/artifact_ui_poc/CHATGPT_DIRECT_CONTENT_REFERENCE.md",
+    "tool_discovery_required_for_render": false,
+    "tool_list_absence_is_unavailability_evidence": false,
     "fallback_only_on_explicit_unavailability_or_render_failure": true
   },
   "verified": {
@@ -29,6 +33,8 @@
   "blocked_gate": "host_handoff",
   "notes": [
     "The first inline render attempt in each new conversation is the presentation-host capability probe; no previous chat is required.",
+    "The currently verified ChatGPT render transport is a direct assistant-response GenUI app_block content reference, not a normal app_block tool call.",
+    "Absence of an app_block tool/action in the current tool list is not evidence that direct content-reference rendering is unavailable.",
     "Do not substitute Sites, MCP Apps, external domains, or standalone browser pages for this path.",
     "A future supported host bridge should transport an already-frozen canonical envelope; it must not create accepted receipts."
   ]
