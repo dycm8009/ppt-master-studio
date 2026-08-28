@@ -21,7 +21,17 @@ jobs:
           SHA="${GITHUB_SHA}"
           ASSET="ppt-master-studio-runtime-${SHA}.zip"
           rm -f "$ASSET" "$ASSET.sha256"
-          zip -qr "$ASSET" . -x '.git/*' "$ASSET" "$ASSET.sha256"
+          zip -qr "$ASSET" \
+            skills/ppt-master \
+            studio/VERSION.json \
+            studio/host/chatgpt/ENTRYPOINT.md \
+            studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md \
+            studio/scripts/enforced_bootstrap.py \
+            studio/scripts/enforced_checkpoint.py \
+            studio/scripts/enforced_preflight.py \
+            studio/scripts/enforced_recovery.py \
+            studio/scripts/static_ui_adapter.py \
+            studio/static_ui
           sha256sum "$ASSET" > "$ASSET.sha256"
       - name: Upload connector-downloadable runtime artifact
         uses: actions/upload-artifact@v4
@@ -47,5 +57,5 @@ jobs:
             gh release create "$TAG" "$ASSET" "$ASSET.sha256" \
               --target "$SHA" \
               --title "PPT Master Studio Runtime ${SHA}" \
-              --notes "Commit-bound runtime bundle for PPT Master Studio. Source authority remains GitHub commit ${SHA}; this ZIP is an executable distribution artifact, not a project Recovery Bundle."
+              --notes "Commit-bound minimal ChatGPT host runtime for PPT Master Studio. PPT workflow authority remains skills/ppt-master at commit ${SHA}; this ZIP is not a project Recovery Bundle."
           fi
