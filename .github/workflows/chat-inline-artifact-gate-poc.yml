@@ -29,5 +29,7 @@ jobs:
         run: python -m studio.artifact_ui_poc.test_project_models
       - name: Verify real Stage 1 and Deck Review renderer fragments
         run: python -m studio.artifact_ui_poc.test_renderer
+      - name: Verify Stage 2 official parity
+        run: python -m studio.artifact_ui_poc.test_stage2_parity
       - name: Verify host-ready artifact packages
         run: python -m studio.artifact_ui_poc.test_package
