@@ -33,7 +33,7 @@ def main() -> int:
 
     direct = (ROOT / "CHATGPT_DIRECT_CONTENT_REFERENCE.md").read_text(encoding="utf-8")
     assert 'genui{"app_block":' in direct
-    assert "not a normal tool call" in direct
+    assert "rather than invoked as a normal tool call" in direct
     assert "Absence from the tool/action list is **not** evidence" in direct
     assert "Do not claim `current host has no inline app_block interface`" in direct
 
