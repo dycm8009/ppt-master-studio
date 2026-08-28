@@ -1,0 +1,11 @@
+{
+  "schema": "ppt-master-studio-mini-app-transport-contract/v1",
+  "transport": "chatgpt_interactive_code_block_preview",
+  "supported_preview_languages": ["html", "react"],
+  "raw_app_block_or_genui_marker_allowed": false,
+  "adapter_may_redefine_official_gate_schema": false,
+  "external_network_required": false,
+  "automatic_preview_to_assistant_callback_assumed": false,
+  "poc_confirmation_return_channel": "user_returns_generated_json_in_chat",
+  "static_html_attachment_is_mini_app_transport": false
+}
