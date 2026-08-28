@@ -1,6 +1,9 @@
 const BOOTSTRAP_PREFIX = '#ppt-master-official-bootstrap=';
 const ADVANCE_PREFIX = '#ppt-master-official-advance=';
+const BOOTSTRAP_GZIP_PREFIX = '#ppt-master-official-bootstrap-gz=';
+const ADVANCE_GZIP_PREFIX = '#ppt-master-official-advance-gz=';
 export const MAX_HANDOFF_BYTES = 131072;
+export const MAX_COMPRESSED_HANDOFF_BYTES = 64 * 1024;
 
 function encodeBase64UrlUtf8(text) {
   const bytes = new TextEncoder().encode(text);
@@ -11,13 +14,16 @@ function encodeBase64UrlUtf8(text) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function decodeBase64UrlUtf8(value) {
+function decodeBase64UrlBytes(value) {
   if (!/^[A-Za-z0-9_-]+$/.test(value || '')) throw new Error('invalid handoff encoding');
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(padded);
-  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+function decodeBase64UrlUtf8(value) {
+  return new TextDecoder().decode(decodeBase64UrlBytes(value));
 }
 
 function encodeEnvelope(value) {
@@ -27,12 +33,25 @@ function encodeEnvelope(value) {
   return encodeBase64UrlUtf8(json);
 }
 
-function decodeEnvelope(encoded) {
-  const json = decodeBase64UrlUtf8(encoded);
+function parseEnvelopeJson(json) {
   if (new TextEncoder().encode(json).byteLength > MAX_HANDOFF_BYTES) throw new Error('browser handoff too large');
   const value = JSON.parse(json);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('browser handoff object required');
   return value;
+}
+
+function decodeEnvelope(encoded) {
+  return parseEnvelopeJson(decodeBase64UrlUtf8(encoded));
+}
+
+async function decodeGzipEnvelope(encoded) {
+  const compressed = decodeBase64UrlBytes(encoded);
+  if (compressed.byteLength > MAX_COMPRESSED_HANDOFF_BYTES) throw new Error('compressed browser handoff too large');
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('this browser does not support gzip handoff decompression');
+  }
+  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return parseEnvelopeJson(await new Response(stream).text());
 }
 
 function assertSession(session) {
@@ -45,6 +64,7 @@ function assertHostKey(hostKey) {
   return String(hostKey);
 }
 
+// Legacy uncompressed builders remain only for compatibility tests and old links.
 export function buildBootstrapHash({ session, host_key, payload }) {
   return `${BOOTSTRAP_PREFIX}${encodeEnvelope({
     schema: 'ppt-master-hosted-official-bootstrap-handoff/v2',
@@ -63,29 +83,35 @@ export function buildAdvanceHash({ session, host_key, api_snapshot }) {
   })}`;
 }
 
-function decodeCurrentHash(hash) {
+async function decodeCurrentHash(hash) {
   const text = String(hash || '');
-  if (text.startsWith(BOOTSTRAP_PREFIX)) {
-    const value = decodeEnvelope(text.slice(BOOTSTRAP_PREFIX.length));
+  let value;
+  let kind;
+  if (text.startsWith(BOOTSTRAP_GZIP_PREFIX)) {
+    value = await decodeGzipEnvelope(text.slice(BOOTSTRAP_GZIP_PREFIX.length));
+    if (value.schema !== 'ppt-master-hosted-official-bootstrap-handoff/v3') throw new Error('unsupported compressed bootstrap handoff');
+    kind = 'bootstrap';
+  } else if (text.startsWith(ADVANCE_GZIP_PREFIX)) {
+    value = await decodeGzipEnvelope(text.slice(ADVANCE_GZIP_PREFIX.length));
+    if (value.schema !== 'ppt-master-hosted-official-advance-handoff/v2') throw new Error('unsupported compressed advance handoff');
+    kind = 'advance';
+  } else if (text.startsWith(BOOTSTRAP_PREFIX)) {
+    value = decodeEnvelope(text.slice(BOOTSTRAP_PREFIX.length));
     if (value.schema !== 'ppt-master-hosted-official-bootstrap-handoff/v2') throw new Error('unsupported bootstrap handoff');
-    return {
-      kind: 'bootstrap',
-      ...value,
-      session: assertSession(value.session),
-      host_key: assertHostKey(value.host_key),
-    };
-  }
-  if (text.startsWith(ADVANCE_PREFIX)) {
-    const value = decodeEnvelope(text.slice(ADVANCE_PREFIX.length));
+    kind = 'bootstrap';
+  } else if (text.startsWith(ADVANCE_PREFIX)) {
+    value = decodeEnvelope(text.slice(ADVANCE_PREFIX.length));
     if (value.schema !== 'ppt-master-hosted-official-advance-handoff/v1') throw new Error('unsupported advance handoff');
-    return {
-      kind: 'advance',
-      ...value,
-      session: assertSession(value.session),
-      host_key: assertHostKey(value.host_key),
-    };
+    kind = 'advance';
+  } else {
+    return null;
   }
-  return null;
+  return {
+    kind,
+    ...value,
+    session: assertSession(value.session),
+    host_key: assertHostKey(value.host_key),
+  };
 }
 
 async function postJson(path, body, headers = {}) {
@@ -102,7 +128,7 @@ async function postJson(path, body, headers = {}) {
 export async function runBootstrapPage() {
   const status = document.getElementById('status');
   try {
-    const handoff = decodeCurrentHash(location.hash);
+    const handoff = await decodeCurrentHash(location.hash);
     if (!handoff) throw new Error('PPT Master hosted handoff is missing');
     // The handoff carries bearer material. Erase it before any network request.
     history.replaceState(null, '', location.pathname + location.search);
