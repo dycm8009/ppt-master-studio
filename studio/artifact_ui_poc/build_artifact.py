@@ -8,6 +8,7 @@ from typing import Any
 from .adapter import ArtifactHostProfile, plan_artifact_gate
 from .project_models import deck_review_artifact_model, stage1_artifact_model
 from .renderer import deck_review_artifact_fragment, stage1_artifact_fragment
+from .stage2_parity import stage2_artifact_fragment, stage2_artifact_model
 
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +27,10 @@ def build_artifact_package(
         model = stage1_artifact_model(project)
         content = stage1_artifact_fragment(model)
         title = "PPT Master · Stage 1"
+    elif surface == "stage2":
+        model = stage2_artifact_model(project)
+        content = stage2_artifact_fragment(model)
+        title = "PPT Master · Stage 2"
     elif surface == "deck-review":
         model = deck_review_artifact_model(project)
         content = deck_review_artifact_fragment(model)
@@ -56,7 +61,7 @@ def build_artifact_package(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build a PPT Master chat-inline artifact package")
-    parser.add_argument("surface", choices=("stage1", "deck-review"))
+    parser.add_argument("surface", choices=("stage1", "stage2", "deck-review"))
     parser.add_argument("project", type=Path)
     parser.add_argument("--format", choices=("package", "html", "model"), default="package")
     parser.add_argument("--output", type=Path)
