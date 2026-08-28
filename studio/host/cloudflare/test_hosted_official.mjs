@@ -145,6 +145,21 @@ async function main() {
     throw new Error('official app.js was modified instead of copied unchanged');
   }
 
+  const bootstrap = fs.readFileSync(path.join(dist, 'bootstrap.js'), 'utf8');
+  if (!bootstrap.includes('ppt-master-hosted-official-bootstrap-handoff/v2')) {
+    throw new Error('host-known bootstrap handoff v2 missing');
+  }
+  if (!bootstrap.includes('session: handoff.session') || !bootstrap.includes('host_key: handoff.host_key')) {
+    throw new Error('browser bootstrap no longer creates the predeclared host-known session');
+  }
+  const worker = fs.readFileSync(path.join(here, 'worker.js'), 'utf8');
+  if (!worker.includes("const token = String(body.session || '')") || !worker.includes("const hostKey = String(body.host_key || '')")) {
+    throw new Error('Worker no longer accepts host-known session identity');
+  }
+  if (worker.includes('makeToken(')) {
+    throw new Error('Worker must not silently replace the host-known session identity');
+  }
+
   now += 86401 * 1000;
   const expired = await store.get();
   if (expired.ok) throw new Error('expired session remained live');
