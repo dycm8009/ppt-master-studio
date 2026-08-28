@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Network-free Host bridge for the Cloudflare-hosted official Confirm UI.
 
-The helper gzip-compresses the current official Confirm UI snapshot into a URL
-fragment. The Cloudflare bootstrap page decodes it in the user's browser,
-creates/advances the Durable Object session, then erases the bearer fragment.
+The helper derives its snapshot by invoking the pinned official Confirm UI Flask
+API in-process, gzip-compresses that exact state into a browser URL fragment,
+and later replays the captured payload through the same pinned official
+``/api/confirm`` implementation. Cloudflare is transport only.
 
-When the execution container has no outbound HTTPS, the ChatGPT host can read
-the known ``response_url`` with a host-native Web GET, materialize that JSON,
-and call ``apply-response``. The captured payload is then replayed through the
-pinned official ``confirm_ui/server.py`` Flask `/api/confirm` implementation,
-which remains the validation and receipt authority.
+When the execution container has no outbound HTTPS, the ChatGPT host reads the
+known ``response_url`` with a host-native Web GET, materializes that JSON
+locally, then calls ``apply-response``. No external network request is made by
+this helper.
 """
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def _save_state(project: Path, state: dict[str, Any]) -> None:
 def _load_state(project: Path) -> dict[str, Any]:
     path = _state_path(project)
     if not path.is_file():
-        raise RuntimeError(f"Hosted browser handoff state missing: {path}; run bootstrap with --project first")
+        raise RuntimeError(f"Hosted browser handoff state missing: {path}; run bootstrap-project first")
     state = _load_object(path)
     if state.get("schema") != STATE_SCHEMA:
         raise RuntimeError("unsupported Hosted browser handoff state schema")
@@ -160,6 +160,29 @@ def _official_server_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def official_snapshot(project: Path) -> dict[str, Any]:
+    """Read browser-ready state from the exact pinned official Flask API."""
+    official = _official_server_module()
+    app = official.create_app(str(project.resolve()), idle_timeout=0)
+    with app.test_client() as client:
+        session_response = client.get("/api/session")
+        recommendations_response = client.get("/api/recommendations")
+        session = session_response.get_json(silent=True) or {}
+        recommendations = recommendations_response.get_json(silent=True) or {}
+    if session_response.status_code != 200:
+        raise RuntimeError(f"official /api/session failed: HTTP {session_response.status_code}: {session}")
+    if recommendations_response.status_code != 200:
+        raise RuntimeError(
+            f"official /api/recommendations failed: HTTP {recommendations_response.status_code}: "
+            f"{recommendations.get('error', recommendations)}"
+        )
+    if not isinstance(session, dict) or not isinstance(recommendations, dict):
+        raise RuntimeError("official Confirm UI returned a non-object API snapshot")
+    if recommendations.get("stage") not in {"stage1", "stage2"}:
+        raise RuntimeError(f"official recommendation stage is not hostable: {recommendations.get('stage')!r}")
+    return {"session": session, "recommendations": recommendations}
 
 
 def _replay_official_confirm(project: Path, remote_stage: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -219,26 +242,60 @@ def _response_url(base: str, session: str) -> str:
     return f"{base.rstrip('/')}/api/sessions/{session}/response"
 
 
+def bootstrap_project(project: Path, base: str, harness_commit: str) -> dict[str, str]:
+    snapshot = official_snapshot(project)
+    generated = build_bootstrap_url(base, harness_commit, snapshot)
+    _persist_bootstrap_state(project, base, harness_commit, generated)
+    generated["response_url"] = _response_url(base, generated["session"])
+    generated["stage"] = str(snapshot["recommendations"]["stage"])
+    return generated
+
+
+def advance_project(project: Path) -> dict[str, str]:
+    state = _load_state(project)
+    snapshot = official_snapshot(project)
+    if snapshot["recommendations"].get("stage") != "stage2":
+        raise RuntimeError("official local Confirm UI is not ready for Stage 2")
+    generated = build_advance_url(
+        str(state["remote_base"]), str(state["session"]), str(state["host_key"]), snapshot
+    )
+    generated["response_url"] = _response_url(str(state["remote_base"]), generated["session"])
+    generated["stage"] = "stage2"
+    return generated
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="PPT Master network-free Cloudflare official Confirm UI bridge")
     sub = parser.add_subparsers(dest="command", required=True)
-    boot = sub.add_parser("bootstrap")
-    boot.add_argument("snapshot", type=Path, help="JSON file containing official api_snapshot")
+
+    boot_project = sub.add_parser("bootstrap-project")
+    boot_project.add_argument("project", type=Path)
+    boot_project.add_argument("--base", required=True)
+    boot_project.add_argument("--harness-commit", required=True)
+
+    advance_project_cmd = sub.add_parser("advance-project")
+    advance_project_cmd.add_argument("project", type=Path)
+
+    boot = sub.add_parser("bootstrap", help="low-level: build from an already materialized api_snapshot")
+    boot.add_argument("snapshot", type=Path)
     boot.add_argument("--base", required=True)
     boot.add_argument("--harness-commit", required=True)
     boot.add_argument("--session")
     boot.add_argument("--host-key")
     boot.add_argument("--project", type=Path)
-    advance = sub.add_parser("advance")
-    advance.add_argument("snapshot", type=Path, help="JSON file containing Stage-2 official api_snapshot")
+
+    advance = sub.add_parser("advance", help="low-level: advance from an already materialized Stage-2 api_snapshot")
+    advance.add_argument("snapshot", type=Path)
     advance.add_argument("--base")
     advance.add_argument("--session")
     advance.add_argument("--host-key")
     advance.add_argument("--project", type=Path)
+
     apply = sub.add_parser("apply-response")
     apply.add_argument("project", type=Path)
     apply.add_argument("response", type=Path)
     apply.add_argument("--stage", required=True, choices=["stage1", "stage2"])
+
     status = sub.add_parser("status")
     status.add_argument("project", type=Path)
     return parser
@@ -247,14 +304,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        if args.command == "bootstrap":
+        if args.command == "bootstrap-project":
+            result = bootstrap_project(args.project.resolve(), args.base, args.harness_commit)
+        elif args.command == "advance-project":
+            result = advance_project(args.project.resolve())
+        elif args.command == "bootstrap":
             snapshot = _load_object(args.snapshot)
             result = build_bootstrap_url(
-                args.base,
-                args.harness_commit,
-                snapshot,
-                session=args.session,
-                host_key=args.host_key,
+                args.base, args.harness_commit, snapshot, session=args.session, host_key=args.host_key,
             )
             if args.project:
                 _persist_bootstrap_state(args.project.resolve(), args.base, args.harness_commit, result)
