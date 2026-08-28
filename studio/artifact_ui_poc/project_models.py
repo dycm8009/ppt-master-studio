@@ -27,6 +27,8 @@ PROSE_FIELDS = (
 )
 TEMPLATE_KINDS = ("brand", "style", "layout", "deck")
 XML_DECL_RE = re.compile(r"<\?xml[^>]*>\s*")
+SCRIPT_RE = re.compile(r"<script\b[^>]*>.*?</script\s*>", re.IGNORECASE | re.DOTALL)
+EVENT_ATTR_RE = re.compile(r"\s+on[a-zA-Z0-9_-]+\s*=\s*([\"']).*?\1", re.IGNORECASE | re.DOTALL)
 HREF_RE = re.compile(
     r"(?P<prefix>\b(?:href|xlink:href)\s*=\s*)(?P<quote>[\"'])(?P<ref>[^\"']+)(?P=quote)",
     re.IGNORECASE,
@@ -36,6 +38,15 @@ ID_RE = re.compile(r"\bid\s*=\s*([\"'])([^\"']+)\1")
 
 def _strip_xml_decl(svg: str) -> str:
     return XML_DECL_RE.sub("", svg)
+
+
+def _sanitize_svg_for_artifact(svg: str) -> tuple[str, dict[str, int]]:
+    without_scripts, script_count = SCRIPT_RE.subn("", svg)
+    inert, event_count = EVENT_ATTR_RE.subn("", without_scripts)
+    return inert, {
+        "removed_script_blocks": script_count,
+        "removed_event_handlers": event_count,
+    }
 
 
 def stage1_artifact_model(project: Path) -> dict[str, Any]:
@@ -168,7 +179,10 @@ def inline_svg_assets(
     def repl(match: re.Match[str]) -> str:
         nonlocal total, count
         prefix, quote, ref = match.group("prefix"), match.group("quote"), match.group("ref")
-        if re.match(r"^(?:data:|https?://|#)", ref, re.IGNORECASE):
+        if re.match(r"^(?:data:|#)", ref, re.IGNORECASE):
+            return match.group(0)
+        if re.match(r"^https?://", ref, re.IGNORECASE):
+            issues.append(f"remote SVG asset is not self-contained in {svg_path.name}: {ref}")
             return match.group(0)
         if ref.lower().startswith("file:"):
             issues.append(f"unsupported file URI in {svg_path.name}: {ref}")
@@ -222,13 +236,14 @@ def deck_review_artifact_model(
         validator_svg_sha256 = hashlib.sha256(validator_svg.encode("utf-8")).hexdigest()
         validator_roster.append((path.name, validator_svg_sha256))
 
-        artifact_source = _strip_xml_decl(original)
+        artifact_source, sanitization = _sanitize_svg_for_artifact(_strip_xml_decl(original))
         artifact_svg, asset_info = inline_svg_assets(
             artifact_source,
             project=project,
             svg_path=path,
             max_total_asset_bytes=max_total_asset_bytes_per_slide,
         )
+        asset_info.update(sanitization)
         all_issues.extend(asset_info["issues"])
         element_ids = []
         seen = set()
