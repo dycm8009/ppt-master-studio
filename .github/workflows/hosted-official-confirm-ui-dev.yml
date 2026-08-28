@@ -25,7 +25,7 @@ jobs:
       - name: Build pinned official UI assets
         working-directory: studio/host/cloudflare
         run: npm run build
-      - name: Check official frontend/API drift
+      - name: Check official frontend/API drift and production boundary
         working-directory: studio/host/cloudflare
         run: npm run test:contract
       - name: Test compact browser handoff
@@ -39,7 +39,7 @@ jobs:
         run: node test_hosted_editor.mjs
       - name: Compile Runtime bridge helpers
         working-directory: studio/host/cloudflare
-        run: python -m py_compile hosted_confirm_handoff.py hosted_editor_bridge.py test_runtime_roundtrip.py
+        run: python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_confirm_runtime_roundtrip.py test_runtime_roundtrip.py
       - name: Wrangler dev bundle dry-run
         working-directory: studio/host/cloudflare
         run: npx wrangler deploy --dry-run --config wrangler.jsonc
