@@ -15,11 +15,13 @@ def run(*args, ok=True):
 
 def main():
     v=json.loads((ROOT/'studio/VERSION.json').read_text())
-    assert v['studio_version']=='3.2.4'
+    assert v['studio_version']=='3.2.5'
     assert v['static_ui_revision']>=2
     assert v['static_ui_history_limit']==4
     assert v['project_contract_version']=='3.2.0'
-    assert v['host_bootstrap_revision']>=4
+    assert v['host_bootstrap_revision']>=5
+    assert v['project_router_revision']>=1
+    assert 'compact routing/bootstrap/UI-entry contract only' in v['project_router_policy']
     assert v['connector_discovery_required'] is True
     assert v['preloaded_tool_absence_is_connector_unavailable'] is False
     assert v['fresh_sha_resolution_required'] is True
@@ -48,12 +50,24 @@ def main():
     instructions=(ROOT/'studio/CHATGPT_PROJECT_INSTRUCTIONS.txt').read_text(encoding='utf-8')
     bootstrap=(ROOT/'studio/PROJECT_BOOTSTRAP.md').read_text(encoding='utf-8')
     host_rules=(ROOT/'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md').read_text(encoding='utf-8')
-    assert 'NEW 项目不需要 *.ppt-recovery.zip' in instructions
-    assert 'Connector Discovery + Host Capability Detection' in instructions
-    assert '没有预先出现在当前工具列表' in instructions
-    assert '本次会话、本次 bootstrap 中实时读取' in instructions
-    assert '当前预加载工具里没有 download action' in instructions
-    assert 'Harness materialization capability unavailable' in instructions
+    assert '[PPT MASTER STUDIO — PROJECT ROUTER]' in instructions
+    assert 'PPT_MASTER_TASK' in instructions
+    assert '其他情况一律 NEW' in instructions
+    assert '普通 PPTX、PDF、素材包、source ZIP、handoff ZIP' in instructions
+    assert 'NEW 不要求 Recovery Bundle' in instructions
+    assert '用户不需要说“初始化环境”' in instructions
+    assert 'generic/system slides' in instructions
+    assert 'PPT_MASTER_HOST_CAPABILITY_RULES.md' in instructions
+    assert 'pinned Studio commit' in instructions
+    assert 'python -m studio.artifact_ui_poc.build_artifact <surface> <project>' in instructions
+    assert 'captured ≠ accepted' in instructions
+    assert 'ROUTING + BOOTSTRAP + UI TRANSPORT ENTRY' in instructions
+    # Project Instructions must stay router-only. Detailed host transport/materialization
+    # mechanics belong to the pinned repository contracts, not the persistent prompt.
+    assert len(instructions) < 7000
+    assert 'studio-runtime-<SHA>' not in instructions
+    assert 'app_block' not in instructions
+    assert 'current preload' not in instructions.lower()
     assert 'A brand-new project does **not** require a Recovery Bundle.' in bootstrap
     assert 'absence from the immediately preloaded tool list is not enough' in bootstrap
     assert 'fresh current-session read' in bootstrap
@@ -66,6 +80,8 @@ def main():
     assert 'host-provided download tool' in host_rules
     assert 'must never be reported as “public GitHub Web/API was attempted and failed.”' in host_rules
     assert 'Harness materialization capability unavailable' in host_rules
+    assert 'Chat-inline artifact active probe' in host_rules
+    assert 'direct assistant-response GenUI `app_block` content reference' in host_rules
     assert (ROOT/'.github/workflows/studio-runtime-release.yml').is_file()
     static_rules=(ROOT/'studio/enforcement/PPT_MASTER_STATIC_UI_RULES.md').read_text(encoding='utf-8')
     assert 'static_ui/latest.json' in static_rules and 'unique, versioned HTML filename' in static_rules
