@@ -65,6 +65,11 @@ export class OfficialSessionStore {
     return record;
   }
 
+  async _checkHost(hostKey) {
+    const stored = await this.storage.get('host_key');
+    return validHostKey(hostKey) && hostKey === stored;
+  }
+
   async create(payload) {
     const source = assertBootstrap(payload);
     if (await this._load()) return { ok: false, status: 409, error: 'session already exists' };
@@ -131,8 +136,7 @@ export class OfficialSessionStore {
   async advance(hostKey, snapshot) {
     const record = await this._load({ allowClosed: false });
     if (!record) return { ok: false, status: 404, error: 'session missing, closed or expired' };
-    const storedHostKey = await this.storage.get('host_key');
-    if (!validHostKey(hostKey) || hostKey !== storedHostKey) {
+    if (!await this._checkHost(hostKey)) {
       return { ok: false, status: 403, error: 'invalid host key' };
     }
     assertObject(snapshot, 'api_snapshot object required');
@@ -162,6 +166,15 @@ export class OfficialSessionStore {
     record.updated_at = new Date(this.now()).toISOString();
     await this.storage.put('record', record);
     return { ok: true, record };
+  }
+
+  async closeHost(hostKey, reason = 'host-complete') {
+    const record = await this._load();
+    if (!record) return { ok: false, status: 404, error: 'session missing or expired' };
+    if (!await this._checkHost(hostKey)) {
+      return { ok: false, status: 403, error: 'invalid host key' };
+    }
+    return this.close(reason);
   }
 
   async getCaptured() {
