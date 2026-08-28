@@ -1,0 +1,12 @@
+{
+  "schema": "ppt-master-studio-hosted-ui-config/v1",
+  "provider": "cloudflare-workers",
+  "production_base": "https://ppt-master-hosted-confirm.dycm-lab.workers.dev",
+  "dev_base": "https://ppt-master-hosted-confirm-dev.dycm-lab.workers.dev",
+  "session_ttl_seconds": 86400,
+  "authority": {
+    "confirm": "local-pinned-official-confirm-ui",
+    "svg_editor": "local-pinned-official-svg-editor"
+  },
+  "motion_review_surface": false
+}
