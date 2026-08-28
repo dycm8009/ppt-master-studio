@@ -48,7 +48,7 @@ jobs:
           node test_hosted_official.mjs
           node test_hosted_editor.mjs
           python test_confirm_handoff.py
-          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_runtime_roundtrip.py
+          python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_confirm_runtime_roundtrip.py test_runtime_roundtrip.py
           npx wrangler deploy --dry-run --config wrangler.prod.jsonc
       - name: Deploy isolated dev Worker
         if: steps.cf.outputs.ready == 'true'
@@ -66,7 +66,14 @@ jobs:
         if: steps.cf.outputs.ready == 'true'
         working-directory: studio/host/cloudflare
         run: python test_confirm_authority.py
-      - name: Validate deployed Runtime round-trip
+      - name: Validate deployed Confirm Runtime round-trip
+        if: steps.cf.outputs.ready == 'true'
+        working-directory: studio/host/cloudflare
+        env:
+          PPT_MASTER_HOSTED_DEV_BASE: https://ppt-master-hosted-confirm-dev.dycm-lab.workers.dev
+          PPT_MASTER_HARNESS_COMMIT: ${{ github.sha }}
+        run: python test_confirm_runtime_roundtrip.py
+      - name: Validate deployed SVG Editor Runtime round-trip
         if: steps.cf.outputs.ready == 'true'
         working-directory: studio/host/cloudflare
         env:
