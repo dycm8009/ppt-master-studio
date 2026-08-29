@@ -1,0 +1,83 @@
+name: Materialize Hosted Confirm Flaskless Fix
+
+on:
+  push:
+    branches:
+      - fix/hosted-confirm-flaskless-cloudflare-clean
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.event.head_commit.message == 'launch-hosted-confirm-flaskless-fix' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out staged payload
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materialize and verify patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='286984a7f131d4983a197ec05718208df5e20022'
+          test "$(git merge-base HEAD "$BASE_SHA")" = "$BASE_SHA"
+          cat .studio-fix-payload/part-*.b64 | tr -d '\r\n' > "$RUNNER_TEMP/fix.patch.gz.b64"
+          echo 'eb57256991e0fea434f71cbe0366b3ccadf3eb264c2b9935f34be43e846fc315  '"$RUNNER_TEMP/fix.patch.gz.b64" | sha256sum -c -
+          base64 --decode "$RUNNER_TEMP/fix.patch.gz.b64" > "$RUNNER_TEMP/fix.patch.gz"
+          echo '46623b16ede8dd01fd185595ff4c5f934cd502ab982b53344a897e5b003d2543  '"$RUNNER_TEMP/fix.patch.gz" | sha256sum -c -
+          gzip -dc "$RUNNER_TEMP/fix.patch.gz" > "$RUNNER_TEMP/fix.patch"
+          echo '52bae57c3391868524ed6e57d2a9d238b7a953ea0eedbc9c24989d90421c55b0  '"$RUNNER_TEMP/fix.patch" | sha256sum -c -
+          git apply --check "$RUNNER_TEMP/fix.patch"
+          git apply "$RUNNER_TEMP/fix.patch"
+
+      - name: Validate Flask-free Runtime path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 skills/ppt-master/scripts/attribution_guard.py
+          python3 -S -m py_compile \
+            skills/ppt-master/scripts/confirm_ui/server.py \
+            studio/host/cloudflare/hosted_confirm_handoff.py \
+            studio/host/cloudflare/hosted_confirm_bridge.py \
+            studio/scripts/build_runtime_bundle.py \
+            studio/tests/runtime_bundle_headless_test.py
+          python3 studio/tests/runtime_bundle_headless_test.py
+
+      - name: Commit source and headless regression changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --source=HEAD -- \
+            .github/workflows/hosted-official-ui-deploy-prod.yml \
+            .github/workflows/studio-regression.yml \
+            .github/workflows/studio-runtime-release.yml
+          git add \
+            skills/ppt-master/scripts/confirm_ui/server.py \
+            studio/host/chatgpt/ENTRYPOINT.md \
+            studio/host/cloudflare/hosted_confirm_bridge.py \
+            studio/host/cloudflare/hosted_confirm_handoff.py \
+            studio/scripts/build_runtime_bundle.py \
+            studio/tests/runtime_bundle_headless_test.py
+          python3 - <<'PY'
+          import subprocess
+          expected = {
+              'skills/ppt-master/scripts/confirm_ui/server.py',
+              'studio/host/chatgpt/ENTRYPOINT.md',
+              'studio/host/cloudflare/hosted_confirm_bridge.py',
+              'studio/host/cloudflare/hosted_confirm_handoff.py',
+              'studio/scripts/build_runtime_bundle.py',
+              'studio/tests/runtime_bundle_headless_test.py',
+          }
+          actual = set(subprocess.check_output(
+              ['git', 'diff', '--cached', '--name-only'], text=True
+          ).splitlines())
+          if actual != expected:
+              raise SystemExit(f'cached file roster mismatch: {sorted(actual)}')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(hosted-confirm): make Cloudflare confirmation Flask-free'
+          git push origin HEAD:fix/hosted-confirm-flaskless-cloudflare-clean
