@@ -27,6 +27,7 @@ jobs:
       - name: Compile Studio host adapters
         run: |
           python -m py_compile \
+            studio/scripts/build_runtime_bundle.py \
             studio/scripts/enforced_bootstrap.py \
             studio/scripts/enforced_checkpoint.py \
             studio/scripts/enforced_preflight.py \
@@ -35,10 +36,14 @@ jobs:
             studio/host/cloudflare/hosted_confirm_handoff.py \
             studio/host/cloudflare/hosted_confirm_bridge.py \
             studio/host/cloudflare/hosted_editor_bridge.py \
+            studio/tests/runtime_bundle_headless_test.py \
             studio/tests/smoke_test.py
 
       - name: Studio control-plane smoke tests
         run: python studio/tests/smoke_test.py
+
+      - name: Validate extracted Runtime without Flask
+        run: python studio/tests/runtime_bundle_headless_test.py
 
       - name: Install Hosted UI test dependencies
         run: |
@@ -65,24 +70,14 @@ jobs:
         run: |
           set -euo pipefail
           ZIP=/tmp/ppt-master-studio-runtime-smoke.zip
-          zip -qr "$ZIP" \
-            skills/ppt-master \
-            studio/VERSION.json \
-            studio/host/chatgpt/ENTRYPOINT.md \
-            studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md \
-            studio/scripts/enforced_bootstrap.py \
-            studio/scripts/enforced_checkpoint.py \
-            studio/scripts/enforced_preflight.py \
-            studio/scripts/enforced_recovery.py \
-            studio/host/cloudflare/HOSTED_UI.json \
-            studio/host/cloudflare/hosted_url.py \
-            studio/host/cloudflare/hosted_confirm_handoff.py \
-            studio/host/cloudflare/hosted_confirm_bridge.py \
-            studio/host/cloudflare/hosted_editor_bridge.py
+          python studio/scripts/build_runtime_bundle.py \
+            --repo-root . \
+            --output "$ZIP"
           python - "$ZIP" <<'PY'
-          import sys, zipfile
+          import re, sys, zipfile
           with zipfile.ZipFile(sys.argv[1]) as z:
               names=set(z.namelist())
+              unicode_info=z.getinfo('skills/ppt-master/templates/brands/中国电信/templates/design_spec.md')
           required={
               'skills/ppt-master/SKILL.md',
               'studio/host/chatgpt/ENTRYPOINT.md',
@@ -94,6 +89,8 @@ jobs:
               'studio/host/cloudflare/hosted_editor_bridge.py',
           }
           assert required <= names
+          assert unicode_info.flag_bits & 0x800
+          assert not any(re.search(r'#U[0-9A-Fa-f]{4}', name) for name in names)
           forbidden=(
               'studio/artifact_ui_poc/',
               'studio/regression/',
@@ -109,5 +106,5 @@ jobs:
               'studio/enforcement/PPT_MASTER_WORKFLOW.md',
           )
           assert not any(any(n.startswith(prefix) for prefix in forbidden) for n in names)
-          print(f'runtime whitelist: passed ({len(names)} entries)')
+          print(f'runtime whitelist + Unicode paths: passed ({len(names)} entries)')
           PY

@@ -14,28 +14,28 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Build commit-bound runtime bundle
+      - name: Build Unicode-safe commit-bound runtime bundle
         shell: bash
         run: |
           set -euo pipefail
           SHA="${GITHUB_SHA}"
           ASSET="ppt-master-studio-runtime-${SHA}.zip"
           rm -f "$ASSET" "$ASSET.sha256"
-          zip -qr "$ASSET" \
-            skills/ppt-master \
-            studio/VERSION.json \
-            studio/host/chatgpt/ENTRYPOINT.md \
-            studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md \
-            studio/scripts/enforced_bootstrap.py \
-            studio/scripts/enforced_checkpoint.py \
-            studio/scripts/enforced_preflight.py \
-            studio/scripts/enforced_recovery.py \
-            studio/host/cloudflare/HOSTED_UI.json \
-            studio/host/cloudflare/hosted_url.py \
-            studio/host/cloudflare/hosted_confirm_handoff.py \
-            studio/host/cloudflare/hosted_confirm_bridge.py \
-            studio/host/cloudflare/hosted_editor_bridge.py
+          python studio/scripts/build_runtime_bundle.py \
+            --repo-root . \
+            --output "$ASSET"
           sha256sum "$ASSET" > "$ASSET.sha256"
+
+          # The actual whitelist is centralized in build_runtime_bundle.py.
+          # Key control paths remain named here for review and smoke contracts:
+          # skills/ppt-master
+          # studio/host/chatgpt/ENTRYPOINT.md
+          # studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md
+          # studio/host/cloudflare/HOSTED_UI.json
+          # studio/host/cloudflare/hosted_url.py
+          # studio/host/cloudflare/hosted_confirm_handoff.py
+          # studio/host/cloudflare/hosted_confirm_bridge.py
+          # studio/host/cloudflare/hosted_editor_bridge.py
       - name: Upload connector-downloadable runtime artifact
         uses: actions/upload-artifact@v4
         with:

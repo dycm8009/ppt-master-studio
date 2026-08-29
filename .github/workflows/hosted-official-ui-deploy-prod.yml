@@ -43,6 +43,8 @@ jobs:
           python test_confirm_handoff.py
           python -m py_compile hosted_confirm_handoff.py hosted_confirm_bridge.py hosted_editor_bridge.py test_confirm_authority.py test_confirm_runtime_roundtrip.py test_runtime_roundtrip.py
           npx wrangler deploy --dry-run --config wrangler.prod.jsonc
+      - name: Validate packaged Confirm Runtime without Flask
+        run: python studio/tests/runtime_bundle_headless_test.py
       - name: Deploy immutable commit-bound Hosted UI
         uses: cloudflare/wrangler-action@v4
         with:
