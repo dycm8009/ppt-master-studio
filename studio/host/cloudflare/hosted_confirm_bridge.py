@@ -47,11 +47,37 @@ LOCK_NAME = ".confirm_ui.lock"
 DEFAULT_TIMEOUT = 30
 DIRECT_TRANSPORT_MODE = "direct-session"
 DIRECT_FEEDBACK_MODE = "auto-pull-with-copy-json-fallback"
+REMOTE_CREATE_RETRY_DELAYS = (0.5, 1.0, 2.0, 4.0)
+TRANSIENT_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 
 HOST_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 )
+
+
+class RemoteRequestError(RuntimeError):
+    """Structured remote failure so session creation can retry safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: int | None = None,
+        detail: str = "",
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.detail = detail
+        self.retryable = retryable
+
+
+def _transient_http_error(status: int, detail: str) -> bool:
+    text = str(detail or "").lower()
+    return status in TRANSIENT_HTTP_STATUSES or (
+        status == 400 and "internal error; reference" in text
+    )
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -90,12 +116,22 @@ def _request_json(
     except HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
         try:
-            detail = json.loads(raw)
+            payload = json.loads(raw)
         except json.JSONDecodeError:
-            detail = {"error": raw or exc.reason}
-        raise RuntimeError(f"HTTP {exc.code} {url}: {detail.get('error', detail)}") from exc
+            payload = {"error": raw or exc.reason}
+        detail = str(payload.get("error", payload))
+        raise RemoteRequestError(
+            f"HTTP {exc.code} {url}: {detail}",
+            status=exc.code,
+            detail=detail,
+            retryable=_transient_http_error(exc.code, detail),
+        ) from exc
     except (URLError, TimeoutError, OSError) as exc:
-        raise RuntimeError(f"request failed {url}: {exc}") from exc
+        raise RemoteRequestError(
+            f"request failed {url}: {exc}",
+            detail=str(exc),
+            retryable=True,
+        ) from exc
 
 
 def _repo_root() -> Path:
@@ -260,12 +296,56 @@ def _snapshot(local_base: str) -> dict[str, Any]:
     return {"session": session, "recommendations": recommendations}
 
 
+def _validate_created_session(
+    value: Any,
+    *,
+    session: str,
+    harness_commit: str,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RuntimeError("Hosted Confirm session create returned a non-object")
+    returned_session = str(value.get("session") or session)
+    if returned_session != session:
+        raise RuntimeError("Hosted Confirm session create returned a different session")
+    returned_commit = str(value.get("harness_commit") or harness_commit)
+    if returned_commit != harness_commit:
+        raise RuntimeError("Hosted Confirm session create returned a different Harness commit")
+    return value
+
+
+def _recover_existing_session(
+    remote_base: str,
+    session: str,
+    harness_commit: str,
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    record = _request_json("GET", _remote(remote_base, f"/api/sessions/{session}"))
+    if not isinstance(record, dict):
+        raise RuntimeError("Hosted Confirm existing session response is not an object")
+    if str(record.get("harness_commit") or "") != harness_commit:
+        raise RuntimeError("Hosted Confirm existing session uses a different Harness commit")
+    expected_stage = str((snapshot.get("recommendations") or {}).get("stage") or "")
+    if str(record.get("active_stage") or "") != expected_stage:
+        raise RuntimeError("Hosted Confirm existing session uses a different active stage")
+    return {
+        "schema": "ppt-master-hosted-official-session-created/v2",
+        "session": session,
+        "path": f"/s/{session}",
+        "expires_at": record.get("expires_at"),
+        "harness_commit": harness_commit,
+        "recovered_existing_session": True,
+    }
+
+
 def create_remote_session(
     remote_base: str,
     session: str,
     host_key: str,
     harness_commit: str,
     snapshot: dict[str, Any],
+    *,
+    retry_delays: tuple[float, ...] = REMOTE_CREATE_RETRY_DELAYS,
+    sleep: Any = time.sleep,
 ) -> dict[str, Any]:
     if len(session) != 48 or any(ch not in "0123456789abcdef" for ch in session):
         raise RuntimeError("session must be 48 lowercase hex characters")
@@ -273,19 +353,48 @@ def create_remote_session(
         raise RuntimeError("host key must be 64 lowercase hex characters")
     if len(harness_commit) != 40 or any(ch not in "0123456789abcdef" for ch in harness_commit):
         raise RuntimeError("harness commit must be a full 40-hex SHA")
-    return _request_json(
-        "POST",
-        _remote(remote_base, "/api/sessions"),
-        {
-            "session": session,
-            "host_key": host_key,
-            "payload": {
-                "schema": "ppt-master-hosted-official-bootstrap/v1",
-                "harness_commit": harness_commit,
-                "api_snapshot": snapshot,
-            },
+    expected_stage = str((snapshot.get("recommendations") or {}).get("stage") or "")
+    if expected_stage not in {"stage1", "stage2"}:
+        raise RuntimeError("snapshot recommendations.stage must be stage1 or stage2")
+
+    create_url = _remote(remote_base, "/api/sessions")
+    body = {
+        "session": session,
+        "host_key": host_key,
+        "payload": {
+            "schema": "ppt-master-hosted-official-bootstrap/v1",
+            "harness_commit": harness_commit,
+            "api_snapshot": snapshot,
         },
-    )
+    }
+    last_error: RemoteRequestError | None = None
+    for attempt in range(len(retry_delays) + 1):
+        try:
+            created = _request_json("POST", create_url, body)
+            return _validate_created_session(
+                created, session=session, harness_commit=harness_commit
+            )
+        except RemoteRequestError as exc:
+            last_error = exc
+            recoverable = exc.retryable or exc.status == 409
+            if not recoverable:
+                raise
+            try:
+                return _recover_existing_session(
+                    remote_base, session, harness_commit, snapshot
+                )
+            except RemoteRequestError as probe_error:
+                if probe_error.status != 404 and not probe_error.retryable:
+                    raise
+            if attempt >= len(retry_delays):
+                break
+            sleep(retry_delays[attempt])
+
+    assert last_error is not None
+    raise RuntimeError(
+        "Hosted Confirm session was not ready after "
+        f"{len(retry_delays) + 1} create attempts: {last_error}"
+    ) from last_error
 
 
 def open_hosted_confirm(
