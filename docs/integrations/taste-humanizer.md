@@ -7,8 +7,8 @@
 | 0. Decision, provenance, and roadmap | Implemented in the first integration change | Repository documentation and pinned third-party records |
 | 1. Copy naturalness adapter | Implemented in the first integration change | Conditional PPT Master reference, no new route or gate |
 | 2. Taste pilot workspace | Implemented on the Phase 2 experimental branch | Explicit unregistered Style workspace |
-| 3. A/B evaluation | Planned | Repeatable corpus, blind rubric, and recorded evidence |
-| 4. Production promotion | Blocked on Phase 3 | Only measured cross-scenario rules may move into a global reference |
+| 3. A/B evaluation | Evaluation protocol implemented; deck evidence pending | Frozen corpus contract, blind rubric, and result schema |
+| 4. Production promotion | Blocked on completed Phase 3 evidence | Only measured cross-scenario rules may move into a global reference |
 
 The implementation baseline is `studio-main` commit `50779430c8be0fb6800b7a9c79c10756eae6ab78`.
 
@@ -102,16 +102,16 @@ Do not add the pilot to `styles_index.json` until Phase 3 shows that it is a dis
 
 ## 5. Phase 3: A/B evaluation
 
-Use the same source corpus, page-count boundary, model/runtime pin, and confirmation values across variants.
+The repeatable protocol lives in `skills/ppt-master/experiments/taste-humanizer-eval/`. It separates the runtime commit from the explicit Taste workspace source so the four variants do not contaminate one another.
 
-| Variant | Naturalness adapter | Taste pilot |
-|---|---:|---:|
-| Baseline | No | No |
-| Naturalness | Yes | No |
-| Taste | No | Yes |
-| Combined | Yes | Yes |
+| Variant | Runtime | Naturalness adapter | Taste pilot |
+|---|---|---:|---:|
+| Baseline | `50779430c8be0fb6800b7a9c79c10756eae6ab78` | No | No |
+| Naturalness | `82a440ed271ea7381288cb311f4f0c181d44b269` | Yes | No |
+| Taste | Baseline runtime | No | Explicit workspace copied from Phase 2 |
+| Combined | Naturalness runtime | Yes | Explicit workspace copied from Phase 2 |
 
-The corpus must include creative pitch, product launch, investor pitch, technical deep dive, academic research, operating review, incident postmortem, data-heavy material, Chinese, bilingual, Brand, and structured-template scenarios.
+Use the same source bundle, confirmation snapshot, model/host, canvas, page-count boundary, image availability, and production path across variants.
 
 ### 5.1 Measures
 
@@ -121,12 +121,16 @@ The corpus must include creative pitch, product launch, investor pitch, technica
 | Communication quality | Blind reviewer score for clarity, specificity, hierarchy, and audience fit |
 | Visual quality | Preference score plus existing Hard/Soft Visual Review findings |
 | Template safety | Page topology, identity, placeholder, and strict/mirror preservation |
-| Context cost | Loaded prompt bytes/tokens and avoidable repetition |
+| Context cost | Loaded input/output tokens when available and avoidable repetition |
 | Stability | Cross-run variance and failure/rework count |
 
-### 5.2 Promotion threshold
+### 5.2 Evidence state
 
-Promotion requires a consistent preference gain in target scenarios, no factual or topology regressions, no increase in Visual Review Hard findings, and acceptable context cost. Scenario-specific benefit does not justify a global rule.
+The protocol, minimum scenario matrix, blind-review rubric, and result schema are implemented. Phase 3 is not complete until real fixtures, generated artifacts, independent blind scores, and machine findings are recorded for every required scenario.
+
+### 5.3 Promotion threshold
+
+Promotion requires a consistent preference gain in the relevant scenarios, no factual or topology regressions, no increase in Visual Review Hard findings, and acceptable context cost. Scenario-specific benefit does not justify a global rule.
 
 ---
 
