@@ -9,7 +9,9 @@ Cloudflare is a remote interaction mirror only.  The pinned official
 3. let the user interact with the official frontend at a short Hosted URL;
 4. pull Hosted captures and replay them unchanged through official ``/api/confirm`` logic;
 5. after the agent completes Stage-1 template handoff and writes Stage 2,
-   advance the same remote session from exact local official state.
+   advance the same remote session from exact local official state;
+6. when automatic pull is unavailable, accept the page's copied JSON envelope
+   through ``apply-return`` without weakening local validation.
 
 An explicit ``--local-base`` still supports a separately running localhost
 server for compatibility, but the normal Hosted path is headless and must not
@@ -37,11 +39,15 @@ from hosted_confirm_handoff import (
     official_confirm as _headless_confirm,
     official_session as _headless_session,
     official_snapshot as _headless_snapshot,
+    unwrap_return_response,
 )
 
 STATE_NAME = "hosted_confirm.json"
 LOCK_NAME = ".confirm_ui.lock"
 DEFAULT_TIMEOUT = 30
+DIRECT_TRANSPORT_MODE = "direct-session"
+DIRECT_FEEDBACK_MODE = "auto-pull-with-copy-json-fallback"
+
 HOST_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
@@ -50,6 +56,13 @@ HOST_USER_AGENT = (
 
 def _json_bytes(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _load_json_file(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError(f"JSON object required: {path}")
+    return value
 
 
 def _request_json(
@@ -228,6 +241,10 @@ def _remote(base: str, path: str) -> str:
     return base.rstrip("/") + path
 
 
+def _response_url(base: str, session: str) -> str:
+    return _remote(base, f"/api/sessions/{session}/response")
+
+
 def _host_headers(host_key: str) -> dict[str, str]:
     return {"X-PPT-Master-Host-Key": host_key}
 
@@ -294,14 +311,22 @@ def open_hosted_confirm(
         "host_key": key,
         "harness_commit": harness_commit,
         "authority_mode": "headless-official-confirm-api",
+        "transport_mode": DIRECT_TRANSPORT_MODE,
+        "feedback_mode": DIRECT_FEEDBACK_MODE,
         "active_stage": snapshot["recommendations"]["stage"],
         "applied_capture_count": 0,
         "opened_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     _save_state(project, state)
+    session_url = _remote(base, f"/s/{token}")
     return {
         "session": token,
-        "url": _remote(base, f"/s/{token}"),
+        "transport_mode": DIRECT_TRANSPORT_MODE,
+        "feedback_mode": DIRECT_FEEDBACK_MODE,
+        "launch_url": session_url,
+        "session_url": session_url,
+        "response_url": _response_url(base, token),
+        "url": session_url,
         "active_stage": state["active_stage"],
         "local_authority": "pinned-official-confirm-api:headless",
         "expires_at": created.get("expires_at"),
@@ -318,17 +343,20 @@ def _resolved_state(project: Path, args: argparse.Namespace) -> tuple[dict[str, 
     return state, base, session, host_key
 
 
-def pull_and_apply(
+def _apply_response_data(
     project: Path,
-    remote_base: str,
-    session: str,
+    response_data: dict[str, Any],
     *,
     local_base: str | None = None,
 ) -> dict[str, Any]:
     state = _load_state(project)
-    response = _request_json("GET", _remote(remote_base, f"/api/sessions/{session}/response"))
+    response = unwrap_return_response(
+        response_data, expected_session=str(state.get("session") or "")
+    )
     if response.get("harness_commit") != state.get("harness_commit"):
         raise RuntimeError("remote Hosted Confirm session is bound to a different Harness commit")
+    if response.get("status") != "captured-not-validated" or response.get("harness_status") != "not-validated":
+        raise RuntimeError("Hosted response crossed or changed the authority boundary")
     captures = response.get("captures") or []
     if not isinstance(captures, list):
         raise RuntimeError("Hosted Confirm captures must be an array")
@@ -341,13 +369,16 @@ def pull_and_apply(
         item = captures[index]
         if not isinstance(item, dict) or not isinstance(item.get("payload"), dict):
             raise RuntimeError(f"Hosted Confirm capture {index} is invalid")
+        stage = str(item.get("stage") or "")
+        if stage not in {"stage1", "stage2"}:
+            raise RuntimeError(f"Hosted Confirm capture {index} has invalid stage {stage!r}")
         if local_base:
             result = _local_json(local_base, "POST", "/api/confirm", item["payload"])
             if result.get("status") != "ok":
                 raise RuntimeError(f"official Confirm UI rejected capture {index}: {result}")
         else:
-            _headless_confirm(project, str(item.get("stage") or ""), item["payload"])
-        applied.append(str(item.get("stage") or ""))
+            _headless_confirm(project, stage, item["payload"])
+        applied.append(stage)
         state["applied_capture_count"] = index + 1
         state["last_applied_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         state["authority_mode"] = authority_mode
@@ -370,6 +401,26 @@ def pull_and_apply(
         "harness_status": "accepted-by-local-official-confirm-ui" if applied else "no-new-capture",
     }
 
+
+def pull_and_apply(
+    project: Path,
+    remote_base: str,
+    session: str,
+    *,
+    local_base: str | None = None,
+) -> dict[str, Any]:
+    response = _request_json("GET", _response_url(remote_base, session))
+    return _apply_response_data(project, response, local_base=local_base)
+
+
+def apply_return(
+    project: Path,
+    response_data: dict[str, Any],
+    *,
+    local_base: str | None = None,
+) -> dict[str, Any]:
+    """Apply JSON copied from the Hosted page without requiring network access."""
+    return _apply_response_data(project, response_data, local_base=local_base)
 
 def advance_stage2(
     project: Path,
@@ -397,10 +448,16 @@ def advance_stage2(
         state.pop("local_base", None)
     state["advanced_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     _save_state(project, state)
+    session_url = _remote(remote_base, f"/s/{session}")
     return {
         "status": result.get("status"),
         "stage": "stage2",
-        "url": _remote(remote_base, f"/s/{session}"),
+        "transport_mode": DIRECT_TRANSPORT_MODE,
+        "feedback_mode": DIRECT_FEEDBACK_MODE,
+        "launch_url": session_url,
+        "session_url": session_url,
+        "response_url": _response_url(remote_base, session),
+        "url": session_url,
         "local_session": snapshot["session"],
     }
 
@@ -457,6 +514,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.choices["advance"].add_argument("--local-base")
     sub.choices["close"].add_argument("--keep-local", action="store_true")
 
+    apply_return_cmd = sub.add_parser("apply-return")
+    apply_return_cmd.add_argument("project")
+    apply_return_cmd.add_argument("response", type=Path)
+    apply_return_cmd.add_argument("--local-base")
+
     status_cmd = sub.add_parser("status")
     status_cmd.add_argument("project")
     return parser
@@ -480,6 +542,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "advance":
             _state, base, session, host_key = _resolved_state(project, args)
             result = advance_stage2(project, base, session, host_key, local_base=args.local_base)
+        elif args.command == "apply-return":
+            result = apply_return(project, _load_json_file(args.response), local_base=args.local_base)
         elif args.command == "close":
             _state, base, session, host_key = _resolved_state(project, args)
             result = close_hosted_confirm(

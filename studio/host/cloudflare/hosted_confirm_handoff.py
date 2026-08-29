@@ -7,10 +7,11 @@ later replays the captured payload through the same pinned official confirmation
 implementation. Cloudflare is transport only; Flask is needed only for the
 optional localhost server, never for this Hosted handoff.
 
-When the execution container has no outbound HTTPS, the ChatGPT host reads the
-known ``response_url`` with a host-native Web GET, materializes that JSON
-locally, then calls ``apply-response``. No external network request is made by
-this helper.
+When the execution container has no outbound HTTPS, this helper returns an
+explicit Cloudflare ``launch_url`` plus the eventual short ``session_url``. The
+Hosted page exposes a copy-JSON return after confirmation; the ChatGPT host may
+either read the known ``response_url`` or materialize the copied envelope, then
+call ``apply-response``. No external network request is made by this helper.
 """
 from __future__ import annotations
 
@@ -32,6 +33,9 @@ MAX_JSON_BYTES = 131072
 MAX_URL_CHARS = 16000
 STATE_NAME = "hosted_browser_handoff.json"
 STATE_SCHEMA = "ppt-master-studio-hosted-confirm-browser-state/v1"
+RETURN_SCHEMA = "ppt-master-hosted-confirm-return/v1"
+BROWSER_TRANSPORT_MODE = "browser-bootstrap-manual-return"
+COPY_JSON_FEEDBACK_MODE = "copy-json"
 
 
 def _load_object(path: Path) -> dict[str, Any]:
@@ -146,6 +150,8 @@ def _persist_bootstrap_state(project: Path, base: str, commit: str, generated: d
         "host_key": generated["host_key"],
         "harness_commit": _assert_hex(commit, 40, "harness_commit"),
         "applied_capture_count": 0,
+        "transport_mode": BROWSER_TRANSPORT_MODE,
+        "feedback_mode": COPY_JSON_FEEDBACK_MODE,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     })
 
@@ -212,8 +218,38 @@ def official_confirm(project: Path, remote_stage: str, payload: dict[str, Any]) 
     return result
 
 
+def unwrap_return_response(
+    value: dict[str, Any],
+    *,
+    expected_session: str | None = None,
+    expected_stage: str | None = None,
+) -> dict[str, Any]:
+    """Accept either the raw Cloudflare response or the browser copy-JSON envelope."""
+    if value.get("schema") != RETURN_SCHEMA:
+        return value
+    session = _assert_hex(str(value.get("session") or ""), 48, "return session")
+    stage = str(value.get("stage") or "")
+    if stage not in {"stage1", "stage2"}:
+        raise RuntimeError("Hosted return envelope stage must be stage1 or stage2")
+    if expected_session and session != expected_session:
+        raise RuntimeError("Hosted return envelope session does not match local handoff state")
+    if expected_stage and stage != expected_stage:
+        raise RuntimeError(
+            f"Hosted return envelope stage mismatch: expected {expected_stage}, got {stage}"
+        )
+    response = value.get("response")
+    if not isinstance(response, dict):
+        raise RuntimeError("Hosted return envelope must contain response object")
+    return response
+
+
 def apply_response(project: Path, response_data: dict[str, Any], expected_stage: str) -> dict[str, Any]:
     state = _load_state(project)
+    response_data = unwrap_return_response(
+        response_data,
+        expected_session=str(state.get("session") or ""),
+        expected_stage=expected_stage,
+    )
     if response_data.get("harness_commit") != state.get("harness_commit"):
         raise RuntimeError("Hosted response Harness commit does not match browser handoff state")
     if response_data.get("status") != "captured-not-validated" or response_data.get("harness_status") != "not-validated":
@@ -248,13 +284,34 @@ def _response_url(base: str, session: str) -> str:
     return f"{base.rstrip('/')}/api/sessions/{session}/response"
 
 
+def _session_url(base: str, session: str) -> str:
+    return f"{base.rstrip('/')}/s/{session}"
+
+
+def decorate_browser_launch(
+    base: str,
+    generated: dict[str, str],
+    stage: str,
+) -> dict[str, str]:
+    launch_url = generated["url"]
+    generated.update({
+        "transport_mode": BROWSER_TRANSPORT_MODE,
+        "feedback_mode": COPY_JSON_FEEDBACK_MODE,
+        "launch_url": launch_url,
+        "session_url": _session_url(base, generated["session"]),
+        "response_url": _response_url(base, generated["session"]),
+        "stage": stage,
+    })
+    return generated
+
+
 def bootstrap_project(project: Path, base: str, harness_commit: str) -> dict[str, str]:
     snapshot = official_snapshot(project)
     generated = build_bootstrap_url(base, harness_commit, snapshot)
     _persist_bootstrap_state(project, base, harness_commit, generated)
-    generated["response_url"] = _response_url(base, generated["session"])
-    generated["stage"] = str(snapshot["recommendations"]["stage"])
-    return generated
+    return decorate_browser_launch(
+        base, generated, str(snapshot["recommendations"]["stage"])
+    )
 
 
 def advance_project(project: Path) -> dict[str, str]:
@@ -262,12 +319,11 @@ def advance_project(project: Path) -> dict[str, str]:
     snapshot = official_snapshot(project)
     if snapshot["recommendations"].get("stage") != "stage2":
         raise RuntimeError("official local Confirm UI is not ready for Stage 2")
+    base = str(state["remote_base"])
     generated = build_advance_url(
-        str(state["remote_base"]), str(state["session"]), str(state["host_key"]), snapshot
+        base, str(state["session"]), str(state["host_key"]), snapshot
     )
-    generated["response_url"] = _response_url(str(state["remote_base"]), generated["session"])
-    generated["stage"] = "stage2"
-    return generated
+    return decorate_browser_launch(base, generated, "stage2")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -321,7 +377,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             if args.project:
                 _persist_bootstrap_state(args.project.resolve(), args.base, args.harness_commit, result)
-            result["response_url"] = _response_url(args.base, result["session"])
+            result = decorate_browser_launch(args.base, result, str(snapshot.get("recommendations", {}).get("stage") or "stage1"))
         elif args.command == "advance":
             snapshot = _load_object(args.snapshot)
             state = _load_state(args.project.resolve()) if args.project else {}
@@ -331,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
             if not base or not session or not host_key:
                 raise RuntimeError("advance requires --project state or explicit --base/--session/--host-key")
             result = build_advance_url(str(base), str(session), str(host_key), snapshot)
-            result["response_url"] = _response_url(str(base), result["session"])
+            result = decorate_browser_launch(str(base), result, "stage2")
         elif args.command == "apply-response":
             result = apply_response(args.project.resolve(), _load_object(args.response), args.stage)
         else:
