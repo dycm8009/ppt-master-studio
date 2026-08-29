@@ -1,0 +1,76 @@
+{
+  "schema": "ppt-master-taste-humanizer-frozen-confirmation/v1",
+  "scenario_id": "chinese-explainer",
+  "confirmation_surface": "delegated-evaluation",
+  "common_stage1": {
+    "primary_language": "zh-CN",
+    "audience": "大型 C++ 代码库的开发工程师、技术负责人和架构师",
+    "communication_intent": "解释 AI 辅助开发对代码库结构的要求，呈现订单路由试点的结果与边界，并推动技术委员会决定是否扩展到两个模块。",
+    "audience_outcome": "受众能够识别六类结构问题，理解试点数据的适用边界，并对下一阶段试点作出决定。",
+    "core_message": "AI 辅助开发的上限取决于代码库是否容易检索、理解、修改和验证；当前单模块试点支持继续验证，但不支持直接全面推广。",
+    "delivery_context": "以现场讲解为主的 15 分钟技术分享，文件会用于会后评审。",
+    "artifact_afterlife": "技术委员会评审材料和下一阶段试点依据。",
+    "content_divergence": "允许重组叙事和压缩重复表述，但必须保留全部数据、样本边界、六项原则、试点条件和最终决策。",
+    "canvas": "ppt169"
+  },
+  "common_stage2": {
+    "reading_mode": "balanced",
+    "page_count": 7,
+    "mode": {
+      "id": "custom",
+      "behavior": "现状问题到六项原则到试点改造、结果边界和扩展决策。"
+    },
+    "visual_style": {
+      "id": "custom",
+      "behavior": "面向工程师的简洁图解风格，浅灰底、深色正文、蓝绿强调；使用原生结构图和对比表，不使用宣传式科技光效。"
+    },
+    "palette": {
+      "background": "#F4F6F7",
+      "secondary_background": "#E7ECEF",
+      "primary": "#173B4D",
+      "accent": "#128C8C",
+      "secondary_accent": "#4A77A8",
+      "body_text": "#23333B"
+    },
+    "typography": {
+      "title_primary": "Microsoft YaHei",
+      "body_primary": "Microsoft YaHei",
+      "english_companion": "Aptos"
+    },
+    "icons": {
+      "library": "tabler-outline",
+      "stroke": 1.8
+    },
+    "image_usage": false,
+    "image_source": "none",
+    "generated_image_rendering": {
+      "id": "custom",
+      "behavior": "不使用生成图片，以原生文本、图表和关系结构为主。"
+    },
+    "ai_image_acquisition_path": "not-applicable",
+    "generation_mode": "continuous",
+    "refine_spec": false,
+    "speaker_notes": true,
+    "custom_animations": false,
+    "narration_audio": false,
+    "visual_review": true
+  },
+  "variant_manipulation": {
+    "baseline": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "naturalness": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "taste": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    },
+    "combined": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    }
+  }
+}

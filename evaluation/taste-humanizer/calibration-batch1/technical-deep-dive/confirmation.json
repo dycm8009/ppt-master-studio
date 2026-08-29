@@ -1,0 +1,77 @@
+{
+  "schema": "ppt-master-taste-humanizer-frozen-confirmation/v1",
+  "scenario_id": "technical-deep-dive",
+  "confirmation_surface": "delegated-evaluation",
+  "common_stage1": {
+    "primary_language": "en",
+    "audience": "Senior C++ engineers, performance owners, and the production change reviewer",
+    "communication_intent": "Explain the arena lifecycle and measured trade-off, account for the staging failure, and obtain a decision on the guarded 10% rollout.",
+    "audience_outcome": "The audience can trace allocation ownership through the batch, identify the failure mode, interpret the benchmark limits, and accept or reject the rollout conditions.",
+    "core_message": "Per-thread batch arenas cut allocation activity and p99 latency in Atlas, but the memory increase and lifetime failure require a staged rollout with explicit rollback guards.",
+    "delivery_context": "Presenter-led 18-minute technical review with the deck retained as an implementation record.",
+    "artifact_afterlife": "Architecture review record and rollout checklist.",
+    "content_divergence": "Reorganize for mechanism clarity, but preserve all values, lifecycle rules, scope exclusions, incident details, limitations, and rollout gates.",
+    "canvas": "ppt169"
+  },
+  "common_stage2": {
+    "reading_mode": "balanced",
+    "page_count": 7,
+    "mode": {
+      "id": "custom",
+      "behavior": "Problem to lifecycle mechanism to evidence to failure mode to guarded decision."
+    },
+    "visual_style": {
+      "id": "custom",
+      "behavior": "Technical editorial system with native diagrams, compact evidence tables, dark navy background, cyan emphasis, and no decorative dashboard chrome."
+    },
+    "palette": {
+      "background": "#0E1822",
+      "secondary_background": "#172636",
+      "primary": "#EAF4FA",
+      "accent": "#35C2D6",
+      "secondary_accent": "#F1A94E",
+      "body_text": "#D7E5EC"
+    },
+    "typography": {
+      "title_primary": "Aptos Display",
+      "body_primary": "Aptos",
+      "code_primary": "Consolas",
+      "english_companion": null
+    },
+    "icons": {
+      "library": "tabler-outline",
+      "stroke": 1.8
+    },
+    "image_usage": false,
+    "image_source": "none",
+    "generated_image_rendering": {
+      "id": "custom",
+      "behavior": "Not used; native geometry carries the mechanism."
+    },
+    "ai_image_acquisition_path": "not-applicable",
+    "generation_mode": "continuous",
+    "refine_spec": false,
+    "speaker_notes": true,
+    "custom_animations": false,
+    "narration_audio": false,
+    "visual_review": true
+  },
+  "variant_manipulation": {
+    "baseline": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "naturalness": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "taste": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    },
+    "combined": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    }
+  }
+}
