@@ -6,7 +6,7 @@
 |---|---|---|
 | 0. Decision, provenance, and roadmap | Implemented in the first integration change | Repository documentation and pinned third-party records |
 | 1. Copy naturalness adapter | Implemented in the first integration change | Conditional PPT Master reference, no new route or gate |
-| 2. Taste pilot workspace | Planned | Explicit unregistered Style workspace |
+| 2. Taste pilot workspace | Implemented on the Phase 2 experimental branch | Explicit unregistered Style workspace |
 | 3. A/B evaluation | Planned | Repeatable corpus, blind rubric, and recorded evidence |
 | 4. Production promotion | Blocked on Phase 3 | Only measured cross-scenario rules may move into a global reference |
 
