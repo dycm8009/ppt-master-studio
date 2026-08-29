@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dycm8009/ppt-master-studio/skills/ppt-master/experiments/taste-humanizer-eval/results.schema.json",
+  "title": "PPT Master Taste and Humanizer Phase 3 results",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evaluation_id",
+    "corpus_commit",
+    "review_protocol",
+    "scenarios",
+    "promotion_decision"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ppt-master-taste-humanizer-eval-results/v1"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "corpus_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "review_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blinded",
+        "reviewer_count",
+        "variant_order_randomized"
+      ],
+      "properties": {
+        "blinded": {
+          "const": true
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "variant_order_randomized": {
+          "const": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "$ref": "#/$defs/scenario_result"
+      }
+    },
+    "promotion_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_complete",
+        "status",
+        "reasons"
+      ],
+      "properties": {
+        "evidence_complete": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "blocked",
+            "eligible",
+            "rejected"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "candidate_rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "scenario_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "fixture_sha256",
+        "confirmation_snapshot_sha256",
+        "variants",
+        "blind_review_complete"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "confirmation_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "blind_review_complete": {
+          "type": "boolean"
+        },
+        "variants": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline",
+            "naturalness",
+            "taste",
+            "combined"
+          ],
+          "properties": {
+            "baseline": {
+              "$ref": "#/$defs/variant_result"
+            },
+            "naturalness": {
+              "$ref": "#/$defs/variant_result"
+            },
+            "taste": {
+              "$ref": "#/$defs/variant_result"
+            },
+            "combined": {
+              "$ref": "#/$defs/variant_result"
+            }
+          }
+        }
+      }
+    },
+    "variant_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_commit",
+        "blind_label",
+        "artifacts",
+        "checks",
+        "factual_fidelity",
+        "template_safety",
+        "cost",
+        "review"
+      ],
+      "properties": {
+        "runtime_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "workspace_source": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "commit",
+                "path"
+              ],
+              "properties": {
+                "commit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "blind_label": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_-]*$"
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project_path",
+            "pptx_path",
+            "pptx_sha256"
+          ],
+          "properties": {
+            "project_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pptx_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pptx_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "design_spec_sha256": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              ]
+            },
+            "spec_lock_sha256": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              ]
+            }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attribution_guard",
+            "project_validation",
+            "svg_quality",
+            "visual_review"
+          ],
+          "properties": {
+            "attribution_guard": {
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            },
+            "project_validation": {
+              "enum": [
+                "pass",
+                "fail",
+                "not-applicable"
+              ]
+            },
+            "svg_quality": {
+              "enum": [
+                "pass",
+                "fail",
+                "not-run"
+              ]
+            },
+            "visual_review": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "hard_findings",
+                "soft_findings"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "not-run"
+                  ]
+                },
+                "hard_findings": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "soft_findings": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "factual_fidelity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "protected_deltas",
+            "unsupported_claims",
+            "lost_claims",
+            "literal_violations"
+          ],
+          "properties": {
+            "protected_deltas": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unsupported_claims": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lost_claims": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "literal_violations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "template_safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicable",
+            "topology_regressions",
+            "identity_regressions"
+          ],
+          "properties": {
+            "applicable": {
+              "type": "boolean"
+            },
+            "topology_regressions": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "identity_regressions": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "input_tokens",
+            "output_tokens",
+            "rework_count"
+          ],
+          "properties": {
+            "input_tokens": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "output_tokens": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              ]
+            },
+            "rework_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewer_scores",
+            "preference_rank"
+          ],
+          "properties": {
+            "reviewer_scores": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/reviewer_score"
+              }
+            },
+            "preference_rank": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            }
+          }
+        }
+      }
+    },
+    "reviewer_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "clarity",
+        "specificity",
+        "hierarchy",
+        "audience_fit",
+        "visual_quality"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clarity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "specificity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "hierarchy": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "audience_fit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "visual_quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "comment": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

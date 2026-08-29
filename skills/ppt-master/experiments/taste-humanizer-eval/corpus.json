@@ -1,0 +1,248 @@
+{
+  "schema": "ppt-master-taste-humanizer-eval-corpus/v1",
+  "purpose": "Define the minimum scenario matrix and frozen variant inputs for Phase 3 evaluation.",
+  "runtime_pins": {
+    "baseline": "50779430c8be0fb6800b7a9c79c10756eae6ab78",
+    "naturalness": "82a440ed271ea7381288cb311f4f0c181d44b269"
+  },
+  "workspace_sources": {
+    "taste_lab": {
+      "commit": "1d50687779f90510d591025c0375a49a322e121a",
+      "path": "skills/ppt-master/experiments/taste-lab-style",
+      "registration": "explicit-unregistered"
+    }
+  },
+  "variants": [
+    {
+      "id": "baseline",
+      "runtime_commit": "50779430c8be0fb6800b7a9c79c10756eae6ab78",
+      "copy_naturalness": false,
+      "explicit_workspace": null
+    },
+    {
+      "id": "naturalness",
+      "runtime_commit": "82a440ed271ea7381288cb311f4f0c181d44b269",
+      "copy_naturalness": true,
+      "explicit_workspace": null
+    },
+    {
+      "id": "taste",
+      "runtime_commit": "50779430c8be0fb6800b7a9c79c10756eae6ab78",
+      "copy_naturalness": false,
+      "explicit_workspace": {
+        "source_commit": "1d50687779f90510d591025c0375a49a322e121a",
+        "source_path": "skills/ppt-master/experiments/taste-lab-style"
+      }
+    },
+    {
+      "id": "combined",
+      "runtime_commit": "82a440ed271ea7381288cb311f4f0c181d44b269",
+      "copy_naturalness": true,
+      "explicit_workspace": {
+        "source_commit": "1d50687779f90510d591025c0375a49a322e121a",
+        "source_path": "skills/ppt-master/experiments/taste-lab-style"
+      }
+    }
+  ],
+  "scenario_requirements": [
+    {
+      "id": "creative-pitch",
+      "category": "creative",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "idea clarity",
+        "visual specificity",
+        "execution honesty"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "product-launch",
+      "category": "launch",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "message hierarchy",
+        "visual rhythm",
+        "claim restraint"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "investor-pitch",
+      "category": "decision",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "argument trace",
+        "metric fidelity",
+        "decision clarity"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "technical-deep-dive",
+      "category": "technical",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "technical precision",
+        "mechanism clarity",
+        "density control"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "academic-research",
+      "category": "academic",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "source fidelity",
+        "uncertainty",
+        "neutral register"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "operating-review",
+      "category": "operating",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "data legibility",
+        "action ownership",
+        "low-slop restraint"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "incident-postmortem",
+      "category": "incident",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "causal accuracy",
+        "responsibility clarity",
+        "neutral tone"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "data-heavy",
+      "category": "data",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "chart/table choice",
+        "density",
+        "editability"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "chinese-explainer",
+      "category": "locale",
+      "language": "zh-CN",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "Chinese naturalness",
+        "claim preservation",
+        "rhythm"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "bilingual-deck",
+      "category": "locale",
+      "language": "zh-CN+en",
+      "route_profile": "generate-default",
+      "template_condition": "free-design",
+      "evaluation_focus": [
+        "language separation",
+        "terminology consistency",
+        "layout fit"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "brand-workspace",
+      "category": "identity",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "explicit-brand-workspace",
+      "evaluation_focus": [
+        "identity precedence",
+        "color/type fidelity",
+        "taste restraint"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    },
+    {
+      "id": "structured-template",
+      "category": "template",
+      "language": "en",
+      "route_profile": "generate-default",
+      "template_condition": "explicit-layout-or-deck-workspace",
+      "evaluation_focus": [
+        "layout identity",
+        "placeholder topology",
+        "strict/adaptive safety"
+      ],
+      "fixture": {
+        "status": "required",
+        "path": null
+      }
+    }
+  ],
+  "freeze_requirements": [
+    "Use one identical source bundle per scenario across all variants.",
+    "Reuse the same Stage 1 and Stage 2 confirmed values across all variants.",
+    "Keep model, host, canvas, page-count boundary, image availability, and generation path fixed.",
+    "Do not register Taste Lab or let ordinary library discovery select it.",
+    "Do not compare variants when a required fixture or confirmation snapshot is missing."
+  ]
+}
