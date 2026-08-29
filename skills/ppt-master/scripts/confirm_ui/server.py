@@ -28,7 +28,8 @@ Examples:
     python3 scripts/confirm_ui/server.py projects/my-project --reset-template-selection
 
 Dependencies:
-    flask>=3.0.0
+    flask>=3.0.0 only for the optional localhost HTTP server. The official API
+    core used by Cloudflare Hosted handoff/bridge is standard-library-only.
 """
 
 import argparse
@@ -49,7 +50,15 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, jsonify, request, send_from_directory
+_FLASK_IMPORT_ERROR: ImportError | None = None
+try:
+    from flask import Flask, jsonify, request, send_from_directory
+except ImportError as exc:  # Hosted Cloudflare handoff uses the headless API below.
+    _FLASK_IMPORT_ERROR = exc
+    Flask = None  # type: ignore[assignment]
+    jsonify = None  # type: ignore[assignment]
+    request = None  # type: ignore[assignment]
+    send_from_directory = None  # type: ignore[assignment]
 
 # Local — sys.path injection for sibling module (code-style.md §3)
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -2454,6 +2463,339 @@ def _build_ai_image_comparison() -> dict:
     }
 
 
+# --- official API core -------------------------------------------------------
+
+def official_session_response(
+    project_dir: str | Path,
+    *,
+    server_port: Optional[int] = None,
+) -> tuple[dict, int]:
+    """Return the authoritative ``/api/session`` payload without HTTP.
+
+    Cloudflare Hosted UI is transport only.  The ChatGPT network-free handoff
+    calls this function directly so a missing optional Flask installation can
+    never force the confirmation gate into chat fallback.  The Flask route
+    below delegates to the same function, keeping one implementation.
+    """
+    project_path = Path(project_dir).resolve()
+    confirm_dir = project_path / CONFIRM_DIR_NAME
+    session = _sync_session_state(
+        confirm_dir,
+        server_port=server_port,
+        event='poll',
+    )
+    return session, 200
+
+
+def official_recommendations_response(
+    project_dir: str | Path,
+) -> tuple[dict, int]:
+    """Return the authoritative ``/api/recommendations`` payload without HTTP."""
+    project_path = Path(project_dir).resolve()
+    confirm_dir = project_path / CONFIRM_DIR_NAME
+    result_file = confirm_dir / RESULT_NAME
+    if (
+        _result_stage(result_file) == 'final'
+        and not _fresh_template_restart(confirm_dir)
+    ):
+        return {
+            'error': (
+                'the current Confirm UI run is complete; reset the template '
+                f'selection and write fresh {TEMPLATE_OPTIONS_NAME} before '
+                'starting another'
+            ),
+        }, 409
+    rec_file = _active_recommendations_path(confirm_dir)
+    if not rec_file.exists():
+        return {'error': f'{rec_file.name} not found'}, 404
+    try:
+        rec_file, data = _read_active_recommendations(confirm_dir)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        return {
+            'error': f'invalid current recommendation file: {exc}',
+        }, 400
+    rec_stage_number = _recommendation_stage(data)
+    if rec_stage_number == 1:
+        stage1_error = _stage1_ready_error(confirm_dir)
+        if stage1_error:
+            return {
+                'error': f'Stage 1 is not ready: {stage1_error}',
+            }, 409
+        try:
+            template_options, _ = _build_template_options(confirm_dir)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            return {
+                'error': f'invalid template options: {exc}',
+            }, 409
+        data['template_options'] = template_options
+        template_required = False
+    else:
+        stage2_error = _stage2_ready_error(
+            project_path,
+            confirm_dir,
+            rec_file,
+        )
+        if stage2_error:
+            return {
+                'error': f'Stage 2 is waiting for template handoff: {stage2_error}',
+            }, 409
+        try:
+            template_required = _template_confirmation_required(project_path)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            return {
+                'error': f'cannot determine active template mode: {exc}',
+            }, 409
+    # Later stages render only downstream sections, so fold earlier confirmed
+    # choices from result.json back in. An in-run refresh then re-inits from
+    # the user's choices instead of catalog defaults.
+    if rec_stage_number >= 2 and result_file.exists():
+        _merge_confirmed_choices(data, result_file)
+    language_error = _canonicalize_primary_language(
+        data,
+        required=True,
+    )
+    if language_error:
+        return {'error': language_error}, 409
+    if not template_required:
+        data.pop('template_application', None)
+    if rec_stage_number == 2:
+        recommendation_error = _template_stage2_error(
+            data,
+            template_required=template_required,
+        )
+        if recommendation_error:
+            return {'error': recommendation_error}, 409
+        recommendation_error = _stage2_custom_candidates_error(data)
+        if recommendation_error:
+            return {'error': recommendation_error}, 409
+        recommendation_error = _stage2_design_directions_error(data)
+        if recommendation_error:
+            return {'error': recommendation_error}, 409
+    if rec_stage_number == 2:
+        proactive_values, proactive_error = (
+            _resolve_proactive_execution_values(data)
+        )
+        if proactive_error:
+            return {'error': proactive_error}, 409
+        for key, value in proactive_values.items():
+            data[key] = {'value': value}
+    # Template application is authored by Strategist from the installed
+    # workspace and current content. Never expose legacy mode fields as
+    # user-facing confirmation controls.
+    recommend = data.get('recommend')
+    if isinstance(recommend, dict):
+        recommend.pop('template_reuse_scope', None)
+        recommend.pop('template_adherence', None)
+    data.pop('template_reuse_scope', None)
+    data.pop('template_adherence', None)
+    return data, 200
+
+
+def official_confirm_response(
+    project_dir: str | Path,
+    payload: object,
+    *,
+    server_port: Optional[int] = None,
+) -> tuple[dict, int]:
+    """Apply one authoritative ``/api/confirm`` payload without HTTP.
+
+    This function owns the same validation and receipt writes as the Flask
+    route.  Hosted captures remain non-authoritative until this function has
+    accepted them and persisted the normal official receipts.
+    """
+    project_path = Path(project_dir).resolve()
+    confirm_dir = project_path / CONFIRM_DIR_NAME
+    if not isinstance(payload, dict):
+        return {'error': 'invalid payload'}, 400
+    confirm_dir.mkdir(parents=True, exist_ok=True)
+    result = dict(payload)
+    template_selection_payload = result.pop('template_selection', None)
+    result_file = confirm_dir / RESULT_NAME
+    raw_stage = result.get('stage')
+    stage = _stage_key(raw_stage)
+    if raw_stage is not None and stage is None:
+        return {'error': 'invalid confirmation stage'}, 400
+    try:
+        rec_file, current_recommendations = _read_active_recommendations(
+            confirm_dir,
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        return {
+            'error': (
+                'cannot confirm without valid current recommendations: '
+                f'{exc}'
+            ),
+        }, 409
+    rec_stage_number = _recommendation_stage(current_recommendations)
+    selection_receipt = None
+    selection_file = confirm_dir / TEMPLATE_SELECTION_NAME
+    write_selection = False
+    if rec_stage_number == 1:
+        stage1_error = _stage1_ready_error(confirm_dir)
+        if stage1_error:
+            return {
+                'error': f'Stage 1 is not ready: {stage1_error}',
+            }, 409
+        if not isinstance(template_selection_payload, dict):
+            return {
+                'error': (
+                    'Stage 1 payload must include template_selection with '
+                    'mode and selection_keys'
+                ),
+            }, 400
+        try:
+            template_options, template_candidates = _build_template_options(
+                confirm_dir,
+            )
+            selection_receipt = _resolve_template_confirmation(
+                template_selection_payload,
+                template_candidates,
+                template_options['options_sha256'],
+            )
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            return {
+                'error': f'invalid Stage 1 template selection: {exc}',
+            }, 400
+        template_required = selection_receipt['mode'] == 'templates'
+        if selection_file.exists():
+            try:
+                existing_selection = _read_template_selection(selection_file)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                return {
+                    'error': (
+                        f'existing template selection is invalid: {exc}; '
+                        'the agent must run --reset-template-selection'
+                    ),
+                }, 409
+            if (
+                existing_selection['selection_sha256']
+                != selection_receipt['selection_sha256']
+            ):
+                return {
+                    'error': (
+                        'Stage 1 already has a different template selection; '
+                        'the agent must run --reset-template-selection'
+                    ),
+                }, 409
+        else:
+            write_selection = True
+    else:
+        if template_selection_payload is not None:
+            return {
+                'error': 'template_selection is accepted only in Stage 1',
+            }, 400
+        stage2_error = _stage2_ready_error(
+            project_path,
+            confirm_dir,
+            rec_file,
+        )
+        if stage2_error:
+            return {
+                'error': f'Stage 2 is waiting for template handoff: {stage2_error}',
+            }, 409
+        try:
+            template_required = _template_confirmation_required(project_path)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            return {
+                'error': f'cannot determine active template mode: {exc}',
+            }, 409
+    stage_error = _submission_stage_error(
+        confirm_dir,
+        stage,
+        recommendations_file=rec_file,
+        recommendations=current_recommendations,
+        template_required=template_required,
+    )
+    if stage_error:
+        return {'error': stage_error}, 409
+    custom_error = _custom_selection_error(result)
+    if custom_error:
+        return {'error': custom_error}, 400
+    previous_result = {}
+    if rec_stage_number >= 2:
+        try:
+            previous_result = _read_json_object(result_file)
+        except (OSError, json.JSONDecodeError, ValueError):
+            pass
+    main_language = None
+    if rec_stage_number > 0:
+        language_source = (
+            previous_result
+            if _recommendation_language(previous_result)
+            else current_recommendations
+        )
+        if not _recommendation_language(language_source):
+            language_source = result
+        language_error = _canonicalize_primary_language(
+            language_source,
+            required=True,
+        )
+        if language_error:
+            return {'error': language_error}, 409
+        main_language = _recommendation_language(language_source)
+        if main_language:
+            result['primary_language'] = main_language
+        else:
+            result.pop('primary_language', None)
+    if rec_stage_number == 2:
+        solution_error = _stage2_solution_error(
+            result,
+            main_language=main_language,
+        )
+        if solution_error:
+            return {'error': solution_error}, 400
+    if rec_stage_number == 2:
+        proactive_defaults, proactive_recommendation_error = (
+            _resolve_proactive_execution_values(current_recommendations)
+        )
+        if proactive_recommendation_error:
+            return {
+                'error': proactive_recommendation_error,
+            }, 409
+        proactive_result_error = _normalize_proactive_execution_result(
+            result,
+            proactive_defaults,
+        )
+        if proactive_result_error:
+            return {'error': proactive_result_error}, 400
+    _normalize_custom_selections(result)
+    locked_values = _apply_locked_recommendations(
+        result,
+        rec_file,
+        result_file,
+        carry_previous=rec_stage_number > 1,
+    )
+    # Formula realization is Executor-owned. Accept the retired field from
+    # older recommendations/clients, but never persist it in a new receipt.
+    result.pop('formula_policy', None)
+    locked_values.pop('formula_policy', None)
+    if rec_stage_number == 1 or not template_required:
+        result.pop('template_application', None)
+        locked_values.pop('template_application', None)
+    result.pop('template_reuse_scope', None)
+    result.pop('template_adherence', None)
+    if stage == 'stage1':
+        result['stage'] = 'stage1'
+        result['status'] = 'stage1-confirmed'
+        if locked_values:
+            result[_LOCKED_RECOMMENDATIONS_KEY] = locked_values
+    else:
+        result.pop(_LOCKED_RECOMMENDATIONS_KEY, None)
+        result['stage'] = 'final'
+        result['status'] = 'confirmed'
+    result['confirmed_at'] = time.strftime('%Y-%m-%dT%H:%M:%S')
+    if write_selection and selection_receipt is not None:
+        _write_json_atomic(selection_file, selection_receipt)
+    _write_json_atomic(result_file, result)
+    _sync_session_state(
+        confirm_dir,
+        server_port=server_port,
+        event=f'{result["stage"]}-submitted',
+    )
+    logger.info('%s confirmation written to %s', result['stage'], result_file)
+    return {'status': 'ok'}, 200
+
+
 # --- app --------------------------------------------------------------------
 
 def create_app(
@@ -2463,6 +2805,13 @@ def create_app(
     server_port: Optional[int] = None,
 ) -> Flask:
     """Create and configure the Flask app for a given project directory."""
+    if Flask is None:
+        raise RuntimeError(
+            'Flask is unavailable for the optional localhost Confirm UI server. '
+            'Use the Cloudflare Hosted handoff/bridge, which calls the pinned '
+            'official Confirm API core without Flask. Original import error: '
+            f'{_FLASK_IMPORT_ERROR}'
+        )
     project_path = Path(project_dir).resolve()
     confirm_dir = project_path / CONFIRM_DIR_NAME
 
@@ -2546,14 +2895,13 @@ def create_app(
     @app.route('/api/session')
     def get_session():
         """Expose the derived template/Strategist wizard state for polling."""
-        session = _sync_session_state(
-            confirm_dir,
+        body, status = official_session_response(
+            project_path,
             server_port=app.config.get('SERVER_PORT'),
-            event='poll',
         )
-        resp = jsonify(session)
+        resp = jsonify(body)
         resp.headers['Cache-Control'] = 'no-store'
-        return resp
+        return (resp, status) if status != 200 else resp
 
     @app.route('/api/catalogs')
     def get_catalogs():
@@ -2595,300 +2943,20 @@ def create_app(
     @app.route('/api/recommendations')
     def get_recommendations():
         """Serve the Strategist-authored recommendations for this project."""
-        result_file = confirm_dir / RESULT_NAME
-        if (
-            _result_stage(result_file) == 'final'
-            and not _fresh_template_restart(confirm_dir)
-        ):
-            return jsonify({
-                'error': (
-                    'the current Confirm UI run is complete; reset the template '
-                    f'selection and write fresh {TEMPLATE_OPTIONS_NAME} before '
-                    'starting another'
-                ),
-            }), 409
-        rec_file = _active_recommendations_path(confirm_dir)
-        if not rec_file.exists():
-            return jsonify({'error': f'{rec_file.name} not found'}), 404
-        try:
-            rec_file, data = _read_active_recommendations(confirm_dir)
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
-            return jsonify({
-                'error': f'invalid current recommendation file: {exc}',
-            }), 400
-        rec_stage_number = _recommendation_stage(data)
-        if rec_stage_number == 1:
-            stage1_error = _stage1_ready_error(confirm_dir)
-            if stage1_error:
-                return jsonify({
-                    'error': f'Stage 1 is not ready: {stage1_error}',
-                }), 409
-            try:
-                template_options, _ = _build_template_options(confirm_dir)
-            except (OSError, json.JSONDecodeError, ValueError) as exc:
-                return jsonify({
-                    'error': f'invalid template options: {exc}',
-                }), 409
-            data['template_options'] = template_options
-            template_required = False
-        else:
-            stage2_error = _stage2_ready_error(
-                project_path,
-                confirm_dir,
-                rec_file,
-            )
-            if stage2_error:
-                return jsonify({
-                    'error': f'Stage 2 is waiting for template handoff: {stage2_error}',
-                }), 409
-            try:
-                template_required = _template_confirmation_required(project_path)
-            except (OSError, json.JSONDecodeError, ValueError) as exc:
-                return jsonify({
-                    'error': f'cannot determine active template mode: {exc}',
-                }), 409
-        # Later stages render only downstream sections, so fold earlier confirmed
-        # choices from result.json back in. An in-run refresh then re-inits from
-        # the user's choices instead of catalog defaults.
-        if rec_stage_number >= 2 and result_file.exists():
-            _merge_confirmed_choices(data, result_file)
-        language_error = _canonicalize_primary_language(
-            data,
-            required=True,
-        )
-        if language_error:
-            return jsonify({'error': language_error}), 409
-        if not template_required:
-            data.pop('template_application', None)
-        if rec_stage_number == 2:
-            recommendation_error = _template_stage2_error(
-                data,
-                template_required=template_required,
-            )
-            if recommendation_error:
-                return jsonify({'error': recommendation_error}), 409
-            recommendation_error = _stage2_custom_candidates_error(data)
-            if recommendation_error:
-                return jsonify({'error': recommendation_error}), 409
-            recommendation_error = _stage2_design_directions_error(data)
-            if recommendation_error:
-                return jsonify({'error': recommendation_error}), 409
-        if rec_stage_number == 2:
-            proactive_values, proactive_error = (
-                _resolve_proactive_execution_values(data)
-            )
-            if proactive_error:
-                return jsonify({'error': proactive_error}), 409
-            for key, value in proactive_values.items():
-                data[key] = {'value': value}
-        # Template application is authored by Strategist from the installed
-        # workspace and current content. Never expose legacy mode fields as
-        # user-facing confirmation controls.
-        recommend = data.get('recommend')
-        if isinstance(recommend, dict):
-            recommend.pop('template_reuse_scope', None)
-            recommend.pop('template_adherence', None)
-        data.pop('template_reuse_scope', None)
-        data.pop('template_adherence', None)
-        # The page polls this endpoint after each confirmation until the AI
-        # creates the next stage file, so it must never be cached.
-        resp = jsonify(data)
+        body, status = official_recommendations_response(project_path)
+        resp = jsonify(body)
         resp.headers['Cache-Control'] = 'no-store'
-        return resp
+        return (resp, status) if status != 200 else resp
 
     @app.route('/api/confirm', methods=['POST'])
     def confirm():
         """Persist the user's final choices to result.json for the AI to read."""
-        payload = request.get_json(silent=True)
-        if not isinstance(payload, dict):
-            return jsonify({'error': 'invalid payload'}), 400
-        confirm_dir.mkdir(parents=True, exist_ok=True)
-        result = dict(payload)
-        template_selection_payload = result.pop('template_selection', None)
-        result_file = confirm_dir / RESULT_NAME
-        raw_stage = result.get('stage')
-        stage = _stage_key(raw_stage)
-        if raw_stage is not None and stage is None:
-            return jsonify({'error': 'invalid confirmation stage'}), 400
-        try:
-            rec_file, current_recommendations = _read_active_recommendations(
-                confirm_dir,
-            )
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
-            return jsonify({
-                'error': (
-                    'cannot confirm without valid current recommendations: '
-                    f'{exc}'
-                ),
-            }), 409
-        rec_stage_number = _recommendation_stage(current_recommendations)
-        selection_receipt = None
-        selection_file = confirm_dir / TEMPLATE_SELECTION_NAME
-        write_selection = False
-        if rec_stage_number == 1:
-            stage1_error = _stage1_ready_error(confirm_dir)
-            if stage1_error:
-                return jsonify({
-                    'error': f'Stage 1 is not ready: {stage1_error}',
-                }), 409
-            if not isinstance(template_selection_payload, dict):
-                return jsonify({
-                    'error': (
-                        'Stage 1 payload must include template_selection with '
-                        'mode and selection_keys'
-                    ),
-                }), 400
-            try:
-                template_options, template_candidates = _build_template_options(
-                    confirm_dir,
-                )
-                selection_receipt = _resolve_template_confirmation(
-                    template_selection_payload,
-                    template_candidates,
-                    template_options['options_sha256'],
-                )
-            except (OSError, json.JSONDecodeError, ValueError) as exc:
-                return jsonify({
-                    'error': f'invalid Stage 1 template selection: {exc}',
-                }), 400
-            template_required = selection_receipt['mode'] == 'templates'
-            if selection_file.exists():
-                try:
-                    existing_selection = _read_template_selection(selection_file)
-                except (OSError, json.JSONDecodeError, ValueError) as exc:
-                    return jsonify({
-                        'error': (
-                            f'existing template selection is invalid: {exc}; '
-                            'the agent must run --reset-template-selection'
-                        ),
-                    }), 409
-                if (
-                    existing_selection['selection_sha256']
-                    != selection_receipt['selection_sha256']
-                ):
-                    return jsonify({
-                        'error': (
-                            'Stage 1 already has a different template selection; '
-                            'the agent must run --reset-template-selection'
-                        ),
-                    }), 409
-            else:
-                write_selection = True
-        else:
-            if template_selection_payload is not None:
-                return jsonify({
-                    'error': 'template_selection is accepted only in Stage 1',
-                }), 400
-            stage2_error = _stage2_ready_error(
-                project_path,
-                confirm_dir,
-                rec_file,
-            )
-            if stage2_error:
-                return jsonify({
-                    'error': f'Stage 2 is waiting for template handoff: {stage2_error}',
-                }), 409
-            try:
-                template_required = _template_confirmation_required(project_path)
-            except (OSError, json.JSONDecodeError, ValueError) as exc:
-                return jsonify({
-                    'error': f'cannot determine active template mode: {exc}',
-                }), 409
-        stage_error = _submission_stage_error(
-            confirm_dir,
-            stage,
-            recommendations_file=rec_file,
-            recommendations=current_recommendations,
-            template_required=template_required,
-        )
-        if stage_error:
-            return jsonify({'error': stage_error}), 409
-        custom_error = _custom_selection_error(result)
-        if custom_error:
-            return jsonify({'error': custom_error}), 400
-        previous_result = {}
-        if rec_stage_number >= 2:
-            try:
-                previous_result = _read_json_object(result_file)
-            except (OSError, json.JSONDecodeError, ValueError):
-                pass
-        main_language = None
-        if rec_stage_number > 0:
-            language_source = (
-                previous_result
-                if _recommendation_language(previous_result)
-                else current_recommendations
-            )
-            if not _recommendation_language(language_source):
-                language_source = result
-            language_error = _canonicalize_primary_language(
-                language_source,
-                required=True,
-            )
-            if language_error:
-                return jsonify({'error': language_error}), 409
-            main_language = _recommendation_language(language_source)
-            if main_language:
-                result['primary_language'] = main_language
-            else:
-                result.pop('primary_language', None)
-        if rec_stage_number == 2:
-            solution_error = _stage2_solution_error(
-                result,
-                main_language=main_language,
-            )
-            if solution_error:
-                return jsonify({'error': solution_error}), 400
-        if rec_stage_number == 2:
-            proactive_defaults, proactive_recommendation_error = (
-                _resolve_proactive_execution_values(current_recommendations)
-            )
-            if proactive_recommendation_error:
-                return jsonify({
-                    'error': proactive_recommendation_error,
-                }), 409
-            proactive_result_error = _normalize_proactive_execution_result(
-                result,
-                proactive_defaults,
-            )
-            if proactive_result_error:
-                return jsonify({'error': proactive_result_error}), 400
-        _normalize_custom_selections(result)
-        locked_values = _apply_locked_recommendations(
-            result,
-            rec_file,
-            result_file,
-            carry_previous=rec_stage_number > 1,
-        )
-        # Formula realization is Executor-owned. Accept the retired field from
-        # older recommendations/clients, but never persist it in a new receipt.
-        result.pop('formula_policy', None)
-        locked_values.pop('formula_policy', None)
-        if rec_stage_number == 1 or not template_required:
-            result.pop('template_application', None)
-            locked_values.pop('template_application', None)
-        result.pop('template_reuse_scope', None)
-        result.pop('template_adherence', None)
-        if stage == 'stage1':
-            result['stage'] = 'stage1'
-            result['status'] = 'stage1-confirmed'
-            if locked_values:
-                result[_LOCKED_RECOMMENDATIONS_KEY] = locked_values
-        else:
-            result.pop(_LOCKED_RECOMMENDATIONS_KEY, None)
-            result['stage'] = 'final'
-            result['status'] = 'confirmed'
-        result['confirmed_at'] = time.strftime('%Y-%m-%dT%H:%M:%S')
-        if write_selection and selection_receipt is not None:
-            _write_json_atomic(selection_file, selection_receipt)
-        _write_json_atomic(result_file, result)
-        _sync_session_state(
-            confirm_dir,
+        body, status = official_confirm_response(
+            project_path,
+            request.get_json(silent=True),
             server_port=app.config.get('SERVER_PORT'),
-            event=f'{result["stage"]}-submitted',
         )
-        logger.info('%s confirmation written to %s', result['stage'], result_file)
-        return jsonify({'status': 'ok'})
+        return jsonify(body), status
 
     return app
 

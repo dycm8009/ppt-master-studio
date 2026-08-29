@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Network-free Host bridge for the Cloudflare-hosted official Confirm UI.
 
-The helper derives its snapshot by invoking the pinned official Confirm UI Flask
-API in-process, gzip-compresses that exact state into a browser URL fragment,
-and later replays the captured payload through the same pinned official
-``/api/confirm`` implementation. Cloudflare is transport only.
+The helper derives its snapshot by invoking the pinned official Confirm API core
+in-process, gzip-compresses that exact state into a browser URL fragment, and
+later replays the captured payload through the same pinned official confirmation
+implementation. Cloudflare is transport only; Flask is needed only for the
+optional localhost server, never for this Hosted handoff.
 
 When the execution container has no outbound HTTPS, the ChatGPT host reads the
 known ``response_url`` with a host-native Web GET, materializes that JSON
@@ -162,20 +163,27 @@ def _official_server_module():
     return module
 
 
-def official_snapshot(project: Path) -> dict[str, Any]:
-    """Read browser-ready state from the exact pinned official Flask API."""
+def official_session(project: Path) -> dict[str, Any]:
+    """Read the exact pinned official wizard session without starting Flask."""
     official = _official_server_module()
-    app = official.create_app(str(project.resolve()), idle_timeout=0)
-    with app.test_client() as client:
-        session_response = client.get("/api/session")
-        recommendations_response = client.get("/api/recommendations")
-        session = session_response.get_json(silent=True) or {}
-        recommendations = recommendations_response.get_json(silent=True) or {}
-    if session_response.status_code != 200:
-        raise RuntimeError(f"official /api/session failed: HTTP {session_response.status_code}: {session}")
-    if recommendations_response.status_code != 200:
+    session, status = official.official_session_response(project.resolve())
+    if status != 200 or not isinstance(session, dict):
+        raise RuntimeError(f"official /api/session failed: HTTP {status}: {session}")
+    return session
+
+
+def official_snapshot(project: Path) -> dict[str, Any]:
+    """Read browser-ready state from the exact pinned official API core."""
+    official = _official_server_module()
+    session, session_status = official.official_session_response(project.resolve())
+    if session_status != 200 or not isinstance(session, dict):
+        raise RuntimeError(f"official /api/session failed: HTTP {session_status}: {session}")
+    recommendations, recommendations_status = (
+        official.official_recommendations_response(project.resolve())
+    )
+    if recommendations_status != 200:
         raise RuntimeError(
-            f"official /api/recommendations failed: HTTP {recommendations_response.status_code}: "
+            f"official /api/recommendations failed: HTTP {recommendations_status}: "
             f"{recommendations.get('error', recommendations)}"
         )
     if not isinstance(session, dict) or not isinstance(recommendations, dict):
@@ -185,15 +193,13 @@ def official_snapshot(project: Path) -> dict[str, Any]:
     return {"session": session, "recommendations": recommendations}
 
 
-def _replay_official_confirm(project: Path, remote_stage: str, payload: dict[str, Any]) -> dict[str, Any]:
+def official_confirm(project: Path, remote_stage: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate one Hosted capture through the pinned official API core."""
     official = _official_server_module()
-    app = official.create_app(str(project.resolve()), idle_timeout=0)
-    with app.test_client() as client:
-        response = client.post("/api/confirm", json=payload)
-        body = response.get_json(silent=True) or {}
-    if response.status_code != 200 or body.get("status") != "ok":
+    body, status = official.official_confirm_response(project.resolve(), payload)
+    if status != 200 or body.get("status") != "ok":
         raise RuntimeError(
-            f"pinned official Confirm UI rejected hosted capture: HTTP {response.status_code}: "
+            f"pinned official Confirm UI rejected hosted capture: HTTP {status}: "
             f"{body.get('error', body)}"
         )
     result_file = project / "confirm_ui" / "result.json"
@@ -224,7 +230,7 @@ def apply_response(project: Path, response_data: dict[str, Any], expected_stage:
     payload = capture.get("payload")
     if not isinstance(payload, dict):
         raise RuntimeError("Hosted capture payload must be an object")
-    result = _replay_official_confirm(project, expected_stage, payload)
+    result = official_confirm(project, expected_stage, payload)
     state["applied_capture_count"] = cursor + 1
     state["last_applied_stage"] = expected_stage
     state["last_applied_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

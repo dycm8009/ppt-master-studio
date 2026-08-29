@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Runtime bridge between the pinned local Confirm UI and Cloudflare Hosted UI.
+"""Runtime bridge between the pinned official Confirm API and Cloudflare.
 
 Cloudflare is a remote interaction mirror only.  The pinned official
 ``confirm_ui/server.py`` remains the validation and receipt authority:
 
-1. start/reuse the local official Confirm UI server without opening localhost;
+1. invoke the official Confirm API core in-process, without requiring Flask;
 2. mirror exact ``/api/session`` + ``/api/recommendations`` state to Cloudflare;
 3. let the user interact with the official frontend at a short Hosted URL;
-4. pull Hosted captures and POST them unchanged to local ``/api/confirm``;
+4. pull Hosted captures and replay them unchanged through official ``/api/confirm`` logic;
 5. after the agent completes Stage-1 template handoff and writes Stage 2,
    advance the same remote session from exact local official state.
+
+An explicit ``--local-base`` still supports a separately running localhost
+server for compatibility, but the normal Hosted path is headless and must not
+attempt to install or start Flask.
 
 State is stored at ``<project>/confirm_ui/hosted_confirm.json`` with restrictive
 permissions when supported.
@@ -28,6 +32,12 @@ import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+from hosted_confirm_handoff import (
+    official_confirm as _headless_confirm,
+    official_session as _headless_session,
+    official_snapshot as _headless_snapshot,
+)
 
 STATE_NAME = "hosted_confirm.json"
 LOCK_NAME = ".confirm_ui.lock"
@@ -273,8 +283,7 @@ def open_hosted_confirm(
     if not project.is_dir():
         raise RuntimeError(f"project directory missing: {project}")
     base = (remote_base or default_remote_base()).rstrip("/")
-    local = ensure_local_confirm_server(project)
-    snapshot = _snapshot(local)
+    snapshot = _headless_snapshot(project)
     token = session or secrets.token_hex(24)
     key = host_key or secrets.token_hex(32)
     created = create_remote_session(base, token, key, harness_commit, snapshot)
@@ -284,7 +293,7 @@ def open_hosted_confirm(
         "session": token,
         "host_key": key,
         "harness_commit": harness_commit,
-        "local_base": local,
+        "authority_mode": "headless-official-confirm-api",
         "active_stage": snapshot["recommendations"]["stage"],
         "applied_capture_count": 0,
         "opened_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -294,7 +303,7 @@ def open_hosted_confirm(
         "session": token,
         "url": _remote(base, f"/s/{token}"),
         "active_stage": state["active_stage"],
-        "local_authority": local,
+        "local_authority": "pinned-official-confirm-api:headless",
         "expires_at": created.get("expires_at"),
     }
 
@@ -326,21 +335,32 @@ def pull_and_apply(
     cursor = int(state.get("applied_capture_count", 0) or 0)
     if cursor > len(captures):
         raise RuntimeError("local Hosted Confirm cursor is ahead of remote history")
-    local = local_base or ensure_local_confirm_server(project)
+    authority_mode = "localhost-http" if local_base else "headless-official-confirm-api"
     applied = []
     for index in range(cursor, len(captures)):
         item = captures[index]
         if not isinstance(item, dict) or not isinstance(item.get("payload"), dict):
             raise RuntimeError(f"Hosted Confirm capture {index} is invalid")
-        result = _local_json(local, "POST", "/api/confirm", item["payload"])
-        if result.get("status") != "ok":
-            raise RuntimeError(f"official Confirm UI rejected capture {index}: {result}")
+        if local_base:
+            result = _local_json(local_base, "POST", "/api/confirm", item["payload"])
+            if result.get("status") != "ok":
+                raise RuntimeError(f"official Confirm UI rejected capture {index}: {result}")
+        else:
+            _headless_confirm(project, str(item.get("stage") or ""), item["payload"])
         applied.append(str(item.get("stage") or ""))
         state["applied_capture_count"] = index + 1
         state["last_applied_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        state["local_base"] = local
+        state["authority_mode"] = authority_mode
+        if local_base:
+            state["local_base"] = local_base
+        else:
+            state.pop("local_base", None)
         _save_state(project, state)
-    local_session = _local_json(local, "GET", "/api/session")
+    local_session = (
+        _local_json(local_base, "GET", "/api/session")
+        if local_base
+        else _headless_session(project)
+    )
     return {
         "remote_capture_count": len(captures),
         "applied_capture_count": int(state.get("applied_capture_count", 0) or 0),
@@ -360,8 +380,7 @@ def advance_stage2(
     local_base: str | None = None,
 ) -> dict[str, Any]:
     state = _load_state(project)
-    local = local_base or ensure_local_confirm_server(project)
-    snapshot = _snapshot(local)
+    snapshot = _snapshot(local_base) if local_base else _headless_snapshot(project)
     if snapshot["recommendations"].get("stage") != "stage2":
         raise RuntimeError("local official Confirm UI is not ready at Stage 2")
     result = _request_json(
@@ -371,7 +390,11 @@ def advance_stage2(
         headers=_host_headers(host_key),
     )
     state["active_stage"] = "stage2"
-    state["local_base"] = local
+    state["authority_mode"] = "localhost-http" if local_base else "headless-official-confirm-api"
+    if local_base:
+        state["local_base"] = local_base
+    else:
+        state.pop("local_base", None)
     state["advanced_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     _save_state(project, state)
     return {
@@ -406,10 +429,8 @@ def status(project: Path) -> dict[str, Any]:
     base = str(state.get("remote_base") or "")
     session = str(state.get("session") or "")
     remote = _request_json("GET", _remote(base, f"/api/sessions/{session}"))
-    local = None
     try:
-        local_base = ensure_local_confirm_server(project)
-        local = _local_json(local_base, "GET", "/api/session")
+        local = _headless_session(project)
     except RuntimeError as exc:
         local = {"error": str(exc)}
     return {"state": state, "remote": remote, "local": local}
