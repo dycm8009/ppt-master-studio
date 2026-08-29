@@ -4,6 +4,8 @@ const BOOTSTRAP_GZIP_PREFIX = '#ppt-master-official-bootstrap-gz=';
 const ADVANCE_GZIP_PREFIX = '#ppt-master-official-advance-gz=';
 export const MAX_HANDOFF_BYTES = 131072;
 export const MAX_COMPRESSED_HANDOFF_BYTES = 64 * 1024;
+export const CREATE_SESSION_RETRY_DELAYS_MS = [0, 500, 1000, 2000, 4000];
+const RETRYABLE_HTTP_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 function encodeBase64UrlUtf8(text) {
   const bytes = new TextEncoder().encode(text);
@@ -114,15 +116,96 @@ async function decodeCurrentHash(hash) {
   };
 }
 
-async function postJson(path, body, headers = {}) {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
+function requestError(response, data) {
+  const message = String(data?.error || `request failed: ${response.status}`);
+  const error = new Error(message);
+  error.status = response.status;
+  error.detail = data;
+  error.retryable = Boolean(
+    data?.retryable === true
+    || RETRYABLE_HTTP_STATUS.has(response.status)
+    || (response.status === 400 && /internal error; reference|durable object|namespace.*not ready/i.test(message))
+  );
+  return error;
+}
+
+async function requestJson(path, { method = 'GET', body, headers = {} } = {}) {
+  const init = { method, headers: { ...headers } };
+  if (body !== undefined) {
+    init.headers = { 'content-type': 'application/json', ...headers };
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(path, init);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `request failed: ${response.status}`);
+  if (!response.ok) throw requestError(response, data);
   return data;
+}
+
+async function postJson(path, body, headers = {}) {
+  return requestJson(path, { method: 'POST', body, headers });
+}
+
+function sleepMs(delay) {
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+async function reconcileCreatedSession(session, harnessCommit, expectedStage) {
+  try {
+    const record = await requestJson(`/api/sessions/${session}`);
+    if (record?.harness_commit !== harnessCommit) return null;
+    if (record?.active_stage !== expectedStage) return null;
+    return {
+      schema: 'ppt-master-hosted-official-session-created/v2',
+      session,
+      path: `/s/${session}`,
+      expires_at: record.expires_at,
+      harness_commit: harnessCommit,
+      reconciled: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function createHostedSessionWithRetry(
+  handoff,
+  { retryDelays = CREATE_SESSION_RETRY_DELAYS_MS, sleep = sleepMs, onRetry = () => {} } = {},
+) {
+  const expectedStage = handoff.payload?.api_snapshot?.recommendations?.stage;
+  if (!['stage1', 'stage2'].includes(expectedStage)) {
+    throw new Error('bootstrap recommendations.stage must be stage1 or stage2');
+  }
+  const requestBody = {
+    session: handoff.session,
+    host_key: handoff.host_key,
+    payload: handoff.payload,
+  };
+  let lastError;
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    const delay = retryDelays[attempt];
+    if (delay > 0) await sleep(delay);
+    try {
+      const created = await postJson('/api/sessions', requestBody);
+      if (created?.session !== handoff.session) throw new Error('hosted session id mismatch');
+      if (created?.harness_commit !== handoff.payload?.harness_commit) {
+        throw new Error('hosted session Harness commit mismatch');
+      }
+      return created;
+    } catch (error) {
+      lastError = error;
+      if (error?.retryable || error?.status === 409) {
+        const reconciled = await reconcileCreatedSession(
+          handoff.session,
+          handoff.payload?.harness_commit,
+          expectedStage,
+        );
+        if (reconciled) return reconciled;
+      }
+      if (!error?.retryable || attempt === retryDelays.length - 1) throw error;
+      onRetry({ attempt: attempt + 1, delay: retryDelays[attempt + 1] || 0, error });
+    }
+  }
+  throw lastError || new Error('hosted session creation failed');
 }
 
 export async function runBootstrapPage() {
@@ -135,12 +218,12 @@ export async function runBootstrapPage() {
 
     if (handoff.kind === 'bootstrap') {
       status.textContent = 'Creating hosted Confirm UI session…';
-      const created = await postJson('/api/sessions', {
-        session: handoff.session,
-        host_key: handoff.host_key,
-        payload: handoff.payload,
+      const created = await createHostedSessionWithRetry(handoff, {
+        onRetry: ({ attempt, delay }) => {
+          const seconds = Math.max(1, Math.ceil(delay / 1000));
+          status.textContent = `Cloudflare session is becoming ready; retry ${attempt} in ${seconds}s…`;
+        },
       });
-      if (created.session !== handoff.session) throw new Error('hosted session id mismatch');
       sessionStorage.setItem(`ppt-master-host-key:${created.session}`, handoff.host_key);
       location.replace(created.path);
       return;
