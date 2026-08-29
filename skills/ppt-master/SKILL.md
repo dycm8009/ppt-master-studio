@@ -73,6 +73,7 @@ never compete with it.
 - Match the user's language and source language unless the user explicitly overrides it.
 - Localize user-facing option labels and explanations. Keep exact enum IDs or field names when needed for precision.
 - Keep `design_spec.md` section headings and field names in the template's original English; content values may use the user's language.
+- Before the active route authors new visible slide prose or agent-authored speaker notes, read [`references/copy-naturalness.md`](references/copy-naturalness.md) once in that owning context. Apply it only to agent-authored expression; it never changes confirmed values, source facts, final/literal text, quotations, legal copy, formulas/code, or template-preserved topology, and it creates no new gate or artifact.
 - Before switching roles, read the corresponding role reference and output:
 
 ```markdown
