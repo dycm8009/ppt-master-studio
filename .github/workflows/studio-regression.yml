@@ -64,6 +64,7 @@ jobs:
           npm run build
           npm run test:contract
           node test_hosted_official.mjs
+          node test_bootstrap_readiness.mjs
           node test_host_return_bridge.mjs
           node test_hosted_editor.mjs
           python test_confirm_handoff.py
