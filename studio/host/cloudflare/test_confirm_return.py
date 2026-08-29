@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contract test for direct Cloudflare launch metadata and copied JSON return."""
+"""Contract test for direct launch, copied return, and session readiness retry."""
 from __future__ import annotations
 
 import json
@@ -58,7 +58,136 @@ def stage1_payload() -> dict:
     }
 
 
+def _remote_error(status: int, detail: str, *, retryable: bool) -> bridge.RemoteRequestError:
+    return bridge.RemoteRequestError(
+        f"HTTP {status}: {detail}",
+        status=status,
+        detail=detail,
+        retryable=retryable,
+    )
+
+
+def remote_session_retry_contract() -> None:
+    session = "2" * 48
+    host_key = "3" * 64
+    commit = "1" * 40
+    snapshot = {"session": {}, "recommendations": {"stage": "stage1"}}
+    original_request = bridge._request_json
+    try:
+        calls: list[tuple[str, str]] = []
+        sleeps: list[float] = []
+
+        def transient_then_success(method, url, body=None, **kwargs):
+            calls.append((method, url))
+            if len(calls) == 1:
+                raise _remote_error(
+                    400, "internal error; reference = transient", retryable=True
+                )
+            if len(calls) == 2:
+                raise _remote_error(404, "session missing", retryable=False)
+            return {
+                "session": session,
+                "harness_commit": commit,
+                "expires_at": "2099-01-01T00:00:00Z",
+            }
+
+        bridge._request_json = transient_then_success
+        created = bridge.create_remote_session(
+            "https://ppt-master-hosted.example",
+            session,
+            host_key,
+            commit,
+            snapshot,
+            retry_delays=(0.0,),
+            sleep=sleeps.append,
+        )
+        assert created["session"] == session
+        assert [method for method, _url in calls] == ["POST", "GET", "POST"]
+        assert sleeps == [0.0]
+
+        calls = []
+
+        def recover_lost_response(method, url, body=None, **kwargs):
+            calls.append((method, url))
+            if method == "POST":
+                raise bridge.RemoteRequestError(
+                    "request failed: connection reset",
+                    detail="connection reset",
+                    retryable=True,
+                )
+            return {
+                "harness_commit": commit,
+                "active_stage": "stage1",
+                "expires_at": "2099-01-01T00:00:00Z",
+            }
+
+        bridge._request_json = recover_lost_response
+        recovered = bridge.create_remote_session(
+            "https://ppt-master-hosted.example",
+            session,
+            host_key,
+            commit,
+            snapshot,
+            retry_delays=(),
+            sleep=lambda _delay: None,
+        )
+        assert recovered["recovered_existing_session"] is True
+        assert [method for method, _url in calls] == ["POST", "GET"]
+
+        calls = []
+
+        def semantic_failure(method, url, body=None, **kwargs):
+            calls.append((method, url))
+            raise _remote_error(
+                400, "unsupported hosted bootstrap schema", retryable=False
+            )
+
+        bridge._request_json = semantic_failure
+        try:
+            bridge.create_remote_session(
+                "https://ppt-master-hosted.example",
+                session,
+                host_key,
+                commit,
+                snapshot,
+                retry_delays=(0.0,),
+                sleep=lambda _delay: None,
+            )
+        except bridge.RemoteRequestError as exc:
+            assert exc.retryable is False
+        else:
+            raise AssertionError("semantic HTTP 400 was retried or accepted")
+        assert len(calls) == 1
+
+        def mismatched_existing_session(method, url, body=None, **kwargs):
+            if method == "POST":
+                raise _remote_error(409, "session already exists", retryable=False)
+            return {
+                "harness_commit": "f" * 40,
+                "active_stage": "stage1",
+            }
+
+        bridge._request_json = mismatched_existing_session
+        try:
+            bridge.create_remote_session(
+                "https://ppt-master-hosted.example",
+                session,
+                host_key,
+                commit,
+                snapshot,
+                retry_delays=(),
+                sleep=lambda _delay: None,
+            )
+        except RuntimeError as exc:
+            assert "different Harness commit" in str(exc)
+        else:
+            raise AssertionError("mismatched existing session was accepted")
+    finally:
+        bridge._request_json = original_request
+
+
 def main() -> int:
+    remote_session_retry_contract()
     with tempfile.TemporaryDirectory(prefix="ppt-master-confirm-return-") as td:
         project = Path(td) / "project"
         initialize_project(project)
@@ -118,7 +247,7 @@ def main() -> int:
         else:
             raise AssertionError("copied return for a different session was accepted")
 
-    print("direct Cloudflare launch + copied JSON return: passed")
+    print("direct Cloudflare launch + copied JSON return + readiness retry: passed")
     return 0
 
 
