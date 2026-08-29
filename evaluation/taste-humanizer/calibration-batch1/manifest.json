@@ -1,0 +1,45 @@
+{
+  "schema": "ppt-master-taste-humanizer-calibration-batch/v1",
+  "batch_id": "calibration-batch1",
+  "purpose": "Freeze three closed-corpus calibration scenarios before four-variant deck generation.",
+  "studio_main_at_creation": "1859e920efe5c485443d18250dd24f964971757a",
+  "formal_eval_protocol": "skills/ppt-master/experiments/taste-humanizer-eval",
+  "variants": {
+    "baseline_runtime": "50779430c8be0fb6800b7a9c79c10756eae6ab78",
+    "naturalness_runtime": "82a440ed271ea7381288cb311f4f0c181d44b269",
+    "taste_workspace_commit": "1d50687779f90510d591025c0375a49a322e121a",
+    "taste_workspace_path": "skills/ppt-master/experiments/taste-lab-style"
+  },
+  "scenarios": [
+    {
+      "id": "creative-pitch",
+      "source_path": "creative-pitch/source.md",
+      "source_sha256": "6d3a2b9b394cc8b5a2ae697e0ad5a46bff643bf8627aa9140fb81a74e4615f4c",
+      "confirmation_path": "creative-pitch/confirmation.json",
+      "confirmation_sha256": "0ddfa897ab6fc62c1fe84c6da537a7a4e31ae54dea4efd2dbcf269b5943bfe57",
+      "page_count": 6,
+      "visual_review": true,
+      "speaker_notes": true
+    },
+    {
+      "id": "technical-deep-dive",
+      "source_path": "technical-deep-dive/source.md",
+      "source_sha256": "7bef281ed82e83f845258cd68b8cb14d7477b13aacfbd6ab82d678c88f285044",
+      "confirmation_path": "technical-deep-dive/confirmation.json",
+      "confirmation_sha256": "dd5f99aec4dbe8dc8edef8f7bef03c5bd8e73188c522d0d9591bbfeb20c1289b",
+      "page_count": 7,
+      "visual_review": true,
+      "speaker_notes": true
+    },
+    {
+      "id": "chinese-explainer",
+      "source_path": "chinese-explainer/source.md",
+      "source_sha256": "356327d79b1e0cbd2c040042850f818514c92ba06d12463e25d53084a9f7bea8",
+      "confirmation_path": "chinese-explainer/confirmation.json",
+      "confirmation_sha256": "dbe34b8a57d1bfde4669201f5a726c830772bd2f93a080bdb647e85efbf62cbf",
+      "page_count": 7,
+      "visual_review": true,
+      "speaker_notes": true
+    }
+  ]
+}

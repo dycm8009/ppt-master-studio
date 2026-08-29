@@ -1,0 +1,76 @@
+{
+  "schema": "ppt-master-taste-humanizer-frozen-confirmation/v1",
+  "scenario_id": "creative-pitch",
+  "confirmation_surface": "delegated-evaluation",
+  "common_stage1": {
+    "primary_language": "en",
+    "audience": "Northline Public Library director, program owner, and communications lead",
+    "communication_intent": "Persuade the leadership team to approve the Night Shelf concept, pilot budget, scope, and measurement plan.",
+    "audience_outcome": "The team can explain the audience tension, judge the concept against the evidence, and make the four-part approval decision.",
+    "core_message": "Night Shelf turns an existing evening visit into one protected hour for leisure reading; approve a measured six-week pilot rather than treating the idea as a guaranteed growth claim.",
+    "delivery_context": "Presenter-led 12-minute decision meeting, followed by reader-led review.",
+    "artifact_afterlife": "Approval record and production handoff.",
+    "content_divergence": "Re-architect freely for a persuasive narrative, but preserve every figure, qualifier, approved concept line, budget item, date, prohibition, and decision ask.",
+    "canvas": "ppt169"
+  },
+  "common_stage2": {
+    "reading_mode": "presentation",
+    "page_count": 6,
+    "mode": {
+      "id": "custom",
+      "behavior": "Audience truth to tension to idea to touchpoint proof to pilot decision."
+    },
+    "visual_style": {
+      "id": "custom",
+      "behavior": "Late-evening editorial system with restrained charcoal fields, warm amber emphasis, off-white text, and varied full-slide compositions. No fake photography or product UI."
+    },
+    "palette": {
+      "background": "#17191C",
+      "secondary_background": "#24272B",
+      "primary": "#F2E9D8",
+      "accent": "#E3A62F",
+      "secondary_accent": "#7C8A97",
+      "body_text": "#F2E9D8"
+    },
+    "typography": {
+      "title_primary": "Aptos Display",
+      "body_primary": "Aptos",
+      "english_companion": null
+    },
+    "icons": {
+      "library": "phosphor-duotone",
+      "stroke": null
+    },
+    "image_usage": false,
+    "image_source": "none",
+    "generated_image_rendering": {
+      "id": "custom",
+      "behavior": "Not used; retain the direction only as a no-image editorial reference."
+    },
+    "ai_image_acquisition_path": "not-applicable",
+    "generation_mode": "continuous",
+    "refine_spec": false,
+    "speaker_notes": true,
+    "custom_animations": false,
+    "narration_audio": false,
+    "visual_review": true
+  },
+  "variant_manipulation": {
+    "baseline": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "naturalness": {
+      "template_mode": "free_design",
+      "explicit_workspace": null
+    },
+    "taste": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    },
+    "combined": {
+      "template_mode": "templates",
+      "explicit_workspace": "taste_lab"
+    }
+  }
+}
