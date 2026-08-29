@@ -53,8 +53,25 @@
     "POST /api/sessions",
     "GET /api/sessions/<48hex>",
     "GET /api/sessions/<48hex>/response",
-    "POST /api/sessions/<48hex>/response"
+    "POST /api/sessions/<48hex>/advance",
+    "POST /api/sessions/<48hex>/close"
   ],
+  "launch_contract": {
+    "direct_session": "When Runtime outbound HTTPS is available, create the Durable Object session first and present the returned short /s/<48hex> Cloudflare URL directly.",
+    "browser_bootstrap": "When Runtime outbound HTTPS is unavailable, present the Cloudflare launch_url containing the bootstrap fragment directly. The browser creates the session and replaces the address with the short /s/<48hex> path. A local/static HTML launcher is forbidden."
+  },
+  "manual_return_contract": {
+    "schema": "ppt-master-hosted-confirm-return/v1",
+    "source": "GET /api/sessions/<48hex>/response after a successful /api/confirm capture",
+    "browser_ui": "The Hosted wrapper displays Copy confirmation JSON plus a read-only textarea and manual selection fallback.",
+    "fields": [
+      "schema",
+      "session",
+      "stage",
+      "response"
+    ],
+    "authority": "The copied JSON is transport only. The pinned local official Confirm API must validate and persist the normal receipts before workflow continuation."
+  },
   "session_routing": {
     "browser_entry": "/s/<48hex>",
     "strategy": "When /s/<token> is served, bind the browser to that Durable Object session using a secure host session mechanism. The unmodified official frontend may continue to issue absolute /api/* requests.",

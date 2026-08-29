@@ -36,6 +36,7 @@ jobs:
             studio/host/cloudflare/hosted_confirm_handoff.py \
             studio/host/cloudflare/hosted_confirm_bridge.py \
             studio/host/cloudflare/hosted_editor_bridge.py \
+            studio/host/cloudflare/test_confirm_return.py \
             studio/tests/runtime_bundle_headless_test.py \
             studio/tests/smoke_test.py
 
@@ -44,6 +45,12 @@ jobs:
 
       - name: Validate extracted Runtime without Flask
         run: python studio/tests/runtime_bundle_headless_test.py
+
+      - name: Validate direct launch and copied return without Flask
+        working-directory: studio/host/cloudflare
+        run: |
+          python -S test_confirm_handoff.py
+          python -S test_confirm_return.py
 
       - name: Install Hosted UI test dependencies
         run: |
@@ -57,9 +64,11 @@ jobs:
           npm run build
           npm run test:contract
           node test_hosted_official.mjs
+          node test_host_return_bridge.mjs
           node test_hosted_editor.mjs
           python test_confirm_handoff.py
           python test_confirm_authority.py
+          python test_confirm_return.py
 
       - name: Wrangler production bundle dry-run
         working-directory: studio/host/cloudflare

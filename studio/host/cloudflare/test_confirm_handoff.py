@@ -56,13 +56,51 @@ def main() -> int:
     boot_value = decode(boot['url'], handoff.BOOTSTRAP_PREFIX)
     assert boot_value['schema'] == 'ppt-master-hosted-official-bootstrap-handoff/v3'
     assert boot_value['payload']['api_snapshot'] == snapshot
+
+    decorated = handoff.decorate_browser_launch(base, dict(boot), 'stage2')
+    assert decorated['transport_mode'] == 'browser-bootstrap-manual-return'
+    assert decorated['feedback_mode'] == 'copy-json'
+    assert decorated['launch_url'] == boot['url']
+    assert decorated['session_url'] == f'{base}/s/{session}'
+    assert decorated['response_url'] == f'{base}/api/sessions/{session}/response'
+    assert decorated['url'] == decorated['launch_url']
+
     advance = handoff.build_advance_url(base, session, host_key, snapshot)
     assert len(advance['url']) < handoff.MAX_URL_CHARS
     assert handoff.ADVANCE_PREFIX in advance['url']
     advance_value = decode(advance['url'], handoff.ADVANCE_PREFIX)
     assert advance_value['schema'] == 'ppt-master-hosted-official-advance-handoff/v2'
     assert advance_value['api_snapshot'] == snapshot
-    print(f"compact Confirm UI handoff: passed (bootstrap={len(boot['url'])}, advance={len(advance['url'])} chars)")
+
+    response = {
+        'status': 'captured-not-validated',
+        'harness_status': 'not-validated',
+        'harness_commit': commit,
+        'captures': [{'stage': 'stage2', 'payload': {'stage': 'final'}}],
+    }
+    return_envelope = {
+        'schema': handoff.RETURN_SCHEMA,
+        'session': session,
+        'stage': 'stage2',
+        'response': response,
+    }
+    assert handoff.unwrap_return_response(
+        return_envelope, expected_session=session, expected_stage='stage2'
+    ) == response
+    assert handoff.unwrap_return_response(response) == response
+    try:
+        handoff.unwrap_return_response(
+            return_envelope, expected_session='f' * 48, expected_stage='stage2'
+        )
+    except RuntimeError as exc:
+        assert 'session' in str(exc)
+    else:
+        raise AssertionError('return envelope with wrong session was accepted')
+
+    print(
+        'compact Confirm UI handoff + explicit copy-JSON return: passed '
+        f'(bootstrap={len(boot["url"])}, advance={len(advance["url"])} chars)'
+    )
     return 0
 
 
