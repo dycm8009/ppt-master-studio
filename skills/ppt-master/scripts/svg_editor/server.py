@@ -75,6 +75,7 @@ from server_common import (  # noqa: E402
     process_alive as _process_alive,
     read_lock as _read_lock,
     release_lock as _release_lock,
+    service_lock_reachable as _service_lock_reachable,
     validate_port as _validate_port,
 )
 
@@ -446,6 +447,8 @@ def create_app(
     app.config['SVG_DIR'] = svg_dir
     app.config['LIVE_MODE'] = live
     app.config['LOCK_FILE'] = lock_file
+    lock = _read_lock(lock_file) if lock_file is not None else None
+    app.config['INSTANCE_ID'] = (lock or {}).get('instance_id')
 
     # In-memory annotation store: {filename: {element_id: annotation_text}}
     app.config['ANNOTATIONS'] = {}
@@ -518,6 +521,7 @@ def create_app(
             'status': 'ok',
             'service': 'live_preview',
             'pid': os.getpid(),
+            'instance_id': app.config.get('INSTANCE_ID'),
             'project': str(project_path),
             'live': app.config['LIVE_MODE'],
             'svg_output': str(svg_dir),
@@ -1048,7 +1052,11 @@ def _legacy_live_lock(project_path: Path) -> Optional[dict]:
     """Return a live legacy root lock, if one exists."""
     legacy_lock = project_path / LEGACY_LOCK_FILE_NAME
     existing = _read_lock(legacy_lock)
-    if existing and _process_alive(_lock_pid(existing)):
+    if _service_lock_reachable(
+        existing,
+        service='live_preview',
+        project=project_path,
+    ):
         return existing
     return None
 
@@ -1070,7 +1078,11 @@ def _shutdown_existing(project_path: Path) -> int:
         port = int(existing.get('port', 0) or 0)
     except (TypeError, ValueError):
         port = 0
-    if not _process_alive(pid):
+    if not _service_lock_reachable(
+        existing,
+        service='live_preview',
+        project=project_path,
+    ):
         _clear_lock(lock_file)
         logger.info('live preview already stopped; cleared stale lock')
         return 0
@@ -1088,14 +1100,29 @@ def _shutdown_existing(project_path: Path) -> int:
             pass
 
     for _ in range(20):
-        if not _process_alive(pid):
+        if not _service_lock_reachable(
+            existing,
+            service='live_preview',
+            project=project_path,
+        ):
             break
         time.sleep(0.1)
-    if _process_alive(pid):
+    if _service_lock_reachable(
+        existing,
+        service='live_preview',
+        project=project_path,
+    ) and _process_alive(pid):
         try:
             os.kill(pid, signal.SIGTERM)
         except OSError:
             pass
+    if _service_lock_reachable(
+        existing,
+        service='live_preview',
+        project=project_path,
+    ):
+        logger.error('live preview remains reachable after shutdown request')
+        return 1
     _clear_lock(lock_file)
     logger.info('live preview server stopped (pid=%s)', pid)
     return 0
@@ -1297,12 +1324,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.daemon:
         existing = _read_lock(lock_file)
-        if existing and _process_alive(_lock_pid(existing)):
+        if _service_lock_reachable(
+            existing,
+            service='live_preview',
+            project=project_path,
+        ):
             return _reuse_running_server(
                 existing,
                 open_browser=args.open_local_browser,
                 requested_port=args.port,
             )
+        if existing:
+            _clear_lock(lock_file)
 
         try:
             runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -1366,14 +1399,27 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Per-project mutual exclusion. The major driver of orphaned servers is
     # --live mode (which used to disable idle timeout entirely) combined with
-    # silent restarts; reusing the running server on duplicate launches catches
-    # the accumulation at its source. Stale locks (dead pid) are overwritten
-    # by _claim_lock.
+    # silent restarts; reusing the identity-verified running server on duplicate
+    # launches catches the accumulation at its source. Unreachable locks are
+    # cleared before _claim_lock.
     try:
         runtime_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         logger.error('cannot create live preview runtime directory: %s (%s)', runtime_dir, exc)
         return 1
+    existing = _read_lock(lock_file)
+    if _service_lock_reachable(
+        existing,
+        service='live_preview',
+        project=project_path,
+    ):
+        return _reuse_running_server(
+            existing,
+            open_browser=args.open_local_browser,
+            requested_port=args.port,
+        )
+    if existing:
+        _clear_lock(lock_file)
     existing = _claim_lock(lock_file, port, browser_url=_server_url(port))
     if existing:
         return _reuse_running_server(

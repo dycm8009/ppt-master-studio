@@ -357,14 +357,20 @@ wait. Create `confirm_ui/recommendations.stage1.json` without reading template
 candidate content, then launch the combined Stage-1 page and post
 `confirm_ui.md`'s required communication + template-choice summary/fallback:
 
+In ChatGPT Work, launch and wait in one retained command session so the service
+stays in the same terminal namespace:
+
 ```bash
-python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --daemon --no-browser
-python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage1
+python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --daemon --wait --no-browser
 ```
 
-After the daemon reports its exact `http://terminal.local:<port>` URL, open
-that URL in Cloud Browser before posting the required Stage-1 chat handoff. Do
-not substitute `127.0.0.1`, `localhost`, or an inferred default port.
+The command yields its exact `http://terminal.local:<port>` URL while it keeps
+waiting. Open that URL in Cloud Browser before posting the required Stage-1
+chat handoff, then resume the same command session for its receipt. Do not
+substitute `127.0.0.1`, `localhost`, or an inferred default port. On hosts whose
+detached services survive command completion, the equivalent two-command
+`--daemon --no-browser` then `--wait-only --wait-stage stage1` sequence remains
+supported.
 
 **Hard rule — Stage 1 is intermediate**: exit `0` from this first wait is an
 instruction to continue, not a route-completion condition. Do not send a final
@@ -400,9 +406,15 @@ or `templates` with at least one server-resolved root.
    `confirm_ui/recommendations.stage2.json` without changing Stage 1; declare
    `stage: "stage2"`, then wait for the final confirmation:
 
+   In ChatGPT Work, start a fresh retained wait session; the existing browser
+   tab reconnects on the same reported URL:
+
    ```bash
-   python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --wait-only
+   python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --daemon --wait --no-browser
    ```
+
+   Other hosts with a surviving detached server may continue to use
+   `--wait-only`.
 
 3. After the final wait returns, read the complete `result.json` exactly once
    and retain that object through Design Spec authoring and its fidelity audit.
@@ -660,10 +672,12 @@ decision nor locks geometry/native readiness.
 
 **Design Parameter Confirmation (Mandatory)**: before the first SVG, output key design parameters from the spec (canvas dimensions, color scheme, font plan, body font size). See executor-base.md §2.
 
-**Live Preview Auto-Startup (Mandatory)**: before the first SVG, automatically start the browser editor in live mode and keep it running continuously through Executor + Step 7 export:
+**Live Preview Auto-Startup (Mandatory)**: before the first SVG, automatically start the browser editor in live mode and keep it running continuously through Executor + Step 7 export. ChatGPT Work retains the foreground command as its long-running tool session:
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --no-browser
 ```
+On hosts whose detached children survive command completion,
+`--live --daemon --no-browser` remains supported.
 - Start when Executor begins; `svg_output/` may be empty. Default: first free port from `6060`; `--port N`: strict bind. Read the exact `browser_url` from output or `<project_path>/live_preview/lock.json`.
 - Open that exact `http://terminal.local:<port>` URL in Cloud Browser. The Flask process listens on `0.0.0.0`; `127.0.0.1` remains internal-only for readiness, shutdown, and renderer calls.
 - Before the first SVG, report that URL or the launch failure; never claim an unavailable preview.

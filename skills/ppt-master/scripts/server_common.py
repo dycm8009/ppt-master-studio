@@ -20,6 +20,9 @@ import logging
 import os
 import socket
 import subprocess
+import urllib.error
+import urllib.request
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -232,6 +235,56 @@ def lock_browser_url(lock: Optional[dict]) -> Optional[str]:
     return cloud_browser_url(port)
 
 
+def service_lock_reachable(
+    lock: Optional[dict],
+    *,
+    service: str,
+    project: Path,
+    timeout: float = 1.0,
+) -> bool:
+    """Return whether a lock resolves to the expected healthy preview service.
+
+    Host-managed command runners may place successive commands in different PID
+    namespaces.  A detached child can remain reachable by port even though a
+    later command cannot signal its recorded PID.  The health identity is
+    therefore the cross-command authority. New locks use a random instance id;
+    legacy locks fall back to matching the PID as response data rather than
+    probing it from the caller's namespace.
+    """
+    if not lock:
+        return False
+    try:
+        port = validate_port(int(lock.get('port', 0) or 0))
+    except (TypeError, ValueError):
+        return False
+    pid = lock_pid(lock)
+    if not pid:
+        return False
+    try:
+        with urllib.request.urlopen(
+            loopback_url(port, '/api/health'),
+            timeout=timeout,
+        ) as response:
+            data = json.load(response)
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
+    if response.status != 200 or not isinstance(data, dict):
+        return False
+    instance_id = lock.get('instance_id')
+    identity_matches = (
+        data.get('instance_id') == instance_id
+        if isinstance(instance_id, str) and instance_id
+        else data.get('pid') == pid
+    )
+    return bool(
+        data.get('status') == 'ok'
+        and data.get('service') == service
+        and data.get('project') == str(project.resolve())
+        and data.get('pid') == pid
+        and identity_matches
+    )
+
+
 def claim_lock(
     lock_file: Path,
     port: int,
@@ -242,13 +295,18 @@ def claim_lock(
 
     Returns ``None`` on success. If another live process already holds the
     slot, returns the existing lock dict (caller surfaces it as an error).
-    A stale lock (pointing at a dead pid) is silently overwritten. New locks
-    may also carry the exact Cloud Browser URL reported by the launcher.
+    Callers must resolve and clear stale locks before claiming. New locks carry
+    an unguessable instance identity so PID reuse cannot make a different
+    process look like the recorded preview service.
     """
     existing = read_lock(lock_file)
     if existing and process_alive(lock_pid(existing)):
         return existing
-    payload = {'pid': os.getpid(), 'port': port}
+    payload = {
+        'pid': os.getpid(),
+        'port': port,
+        'instance_id': uuid.uuid4().hex,
+    }
     if browser_url:
         payload['browser_url'] = browser_url
     lock_file.write_text(json.dumps(payload), encoding='utf-8')

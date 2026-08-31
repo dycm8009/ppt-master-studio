@@ -28,13 +28,18 @@ description: Main-pipeline editor stage for starting live preview and applying s
 
 **Precondition**: no preview service running on this project.
 
+ChatGPT Work retains the foreground process as the long-running service:
+
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --no-browser
 ```
+
+Other hosts may use `--daemon --no-browser` when detached children survive the
+launching command.
 
 (Plain mode — no `--live`. The `--live` flag is reserved for Step 6's auto-startup.)
 
-The launcher starts the server in the background on its selected port, waits for `GET /api/health`, records the actual pid, port, and `browser_url` in `<project_path>/live_preview/lock.json`, and edits `<project_path>/svg_output/` in place. Open the reported URL in Cloud Browser, then tell the user in their language, in one short message:
+The launcher starts the server in the background on its selected port, waits for `GET /api/health`, records the actual pid, port, instance id, and `browser_url` in `<project_path>/live_preview/lock.json`, and edits `<project_path>/svg_output/` in place. Open the reported URL in Cloud Browser, then tell the user in their language, in one short message:
 
 - editor is at the exact URL reported by the launcher, e.g. `http://terminal.local:6060`
 - **Direct edit** (deterministic tweaks — wording, color, coordinates, SVG attributes): select an element → change the controls in the right panel → preview updates immediately, but nothing is written to `svg_output/` until **Apply changes**. `Ctrl+Z` or the **Undo** button drops staged edits step by step; applied changes are logged to `<project>/live_preview/edits.jsonl`. Re-export stays chat-driven and separate: say "re-export" / "重新导出" to refresh the PPTX.
@@ -82,7 +87,7 @@ Triggered by the user signals listed in "When to Run".
 - **Network**: Flask binds `0.0.0.0`; Cloud Browser uses the reported `http://terminal.local:<port>` URL. Process-local health, shutdown, and render requests continue through `127.0.0.1`.
 - **Port**: without `--port`, use the first free port from `6060`; `--port N` binds `N` strictly and fails if unavailable. Read the actual `browser_url` from launch output or `<project_path>/live_preview/lock.json`.
 - **Idle timeout**: plain mode `900s`, `--live` mode `7200s`; override with `--timeout <seconds>` (`0` disables).
-- **Single instance per project**: `<project_path>/live_preview/lock.json` records the running pid + actual port and is the discovery source for project-local consumers. A second launch reuses the live instance unless an explicit, different `--port N` was requested; that mismatch fails and requires `--shutdown` before restart. Stale locks (dead pid) are overwritten on the next launch. Legacy root locks at `<project_path>/.live_preview.lock` are still detected when they point to a live process.
+- **Single instance per project**: `<project_path>/live_preview/lock.json` records the running pid, actual port, and random instance id and is the discovery source for project-local consumers. A second launch reuses only a health-verified live instance unless an explicit, different `--port N` was requested; that mismatch fails and requires `--shutdown` before restart. Unreachable or identity-mismatched locks are cleared on the next launch. Legacy root locks remain supported through health identity checks.
 - **Transient ids**: each element gets a temporary `_edit_N` id while the editor is running. On save, only annotated elements keep their id; unannotated `_edit_N` ids are stripped before write-back.
 - **Browser preview**: the server inlines `<use data-icon>` placeholders and serves `images/*` so SVG renders correctly; the on-disk SVG is unchanged by this preview.
 
@@ -95,10 +100,13 @@ open the conversation's Cloud Browser itself; the active agent opens the exact
 `browser_url` after the health check succeeds.
 
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --no-browser
 # or for Step 6's auto-startup:
-python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --no-browser
 ```
+
+These ChatGPT Work commands run as retained long-lived sessions. Other hosts
+with persistent detached children may append `--daemon`.
 
 **Hard rule**: Do not replace `terminal.local` with `127.0.0.1` or `localhost`
 in Cloud Browser. Do not omit or guess the port; copy the complete URL from the

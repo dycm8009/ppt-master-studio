@@ -91,8 +91,10 @@ default is free design or template mode, including any sole preselected root. Ex
 that template mode expands the registered-kind and supplied-root selectors.
 Show a blank prose value as “not specified” without changing it. End with an
 explicit localized line saying that, if the page did not open, the user may
-confirm or revise the same communication and template choices in chat. Only
-then run `--wait-only --wait-stage stage1`. A chat
+confirm or revise the same communication and template choices in chat. In
+ChatGPT Work, launch with `--daemon --wait` in one retained command session and
+resume that same session after posting the handoff. Other hosts may then run
+`--wait-only --wait-stage stage1`. A chat
 reply to that handoff applies the in-run switch above without waiting for
 timeout. The handoff is context, not confirmation, and silence confirms
 nothing. After launch failure/timeout and the required result re-check, present
@@ -104,6 +106,7 @@ The following launch and wait commands belong to the **UI branch only**:
 
 ```bash
 python3 scripts/confirm_ui/server.py <project_path> --daemon --no-browser  # launch combined Stage 1
+python3 scripts/confirm_ui/server.py <project_path> --daemon --wait --no-browser  # ChatGPT Work retained Stage-1/final session
 python3 scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage1  # communication + template selection
 python3 scripts/confirm_ui/server.py <project_path> --complete-template-selection # after Stage-1 free-design closure / template install
 python3 scripts/confirm_ui/server.py <project_path> --wait-only       # current final Stage 2
@@ -119,11 +122,21 @@ python3 scripts/confirm_ui/server.py <project_path> --shutdown    # Step 4 clean
 - In `--daemon` mode the launcher starts the child with browser opening suppressed, then accepts readiness only when an internal `GET http://127.0.0.1:<port>/api/health` identifies this confirm service, project, and child process. After that check, the active agent opens the reported `terminal.local` URL in Cloud Browser.
 - Confirm UI and live preview use separate base ranges (`5050` and `6060`) plus separate project-local locks (`.confirm_ui.lock` vs `live_preview/lock.json`). Normal Step 4 cleanup releases the confirm port before Step 6; concurrent projects may use different ports.
 - `--daemon` starts the Flask process in the background and returns after the health check. Every Default UI run launches directly into combined Stage 1 and keeps the same process live through final Stage 2. The wait budget defaults to **590 s** (`--wait-timeout`); on timeout the detached server remains live, and the caller re-checks both Stage-1 receipts before chat fallback.
+- ChatGPT Work command sessions may isolate or reclaim detached children when
+  the launching tool call ends. Use `--daemon --wait --no-browser` there so the
+  launcher remains active with its child while the user confirms. The streamed
+  startup receipt still provides the exact Cloud Browser URL. After Stage 1,
+  start the same combined command again for final Stage 2; the existing browser
+  tab reconnects on the reported URL.
 - `--wait-only` attaches to the page opened by `--daemon` and blocks until the requested receipt. If it is already persisted, the command returns before recovery, so a fast submit between launch, chat handoff, and wait is not lost. Otherwise, if the recorded server died, it restarts on the recorded/default port. Use `stage1` for the combined communication/template submission and the default/final wait for Stage 2.
 - `--complete-template-selection` is agent-only. It validates the Stage-1 sidecar and writes the bound `template_handoff.json`; template mode additionally requires at least one project-local `templates/design_spec.<kind>.<id>.md`. Run it after installation/free-design closure and before writing Stage 2. `--reset-template-selection` removes exactly `template_options.json`, `template_selection.json`, and `template_handoff.json`; it does not alter Strategist files, installed template content, or `result.json`. The old `--*-template-phase` names are not aliases.
 - `--shutdown` stops a confirm server left running for this project and exits — **idempotent** (a no-op when nothing is running). Tries a graceful `/api/shutdown`, falls back to killing the recorded pid, then clears the lock. Generate Step 4 runs this on every path so the selected port is released before live preview starts.
 - Every fresh UI run starts with `--reset-template-selection`, then writes valid `<project_path>/confirm_ui/template_options.json` and a newer `recommendations.stage1.json`; `explicit_workspace_roots` is an empty array when no exact root was supplied. Stage 1 writes the bound selection and communication result together. Stage 2 is exposed only when the matching handoff is newer than that selection and its recommendation is newer than the handoff. `--shutdown` needs neither input.
-- Per-project lock at `<project_path>/.confirm_ui.lock` records pid, port, and `browser_url`; duplicate launches are refused and stale locks (dead pid) are overwritten.
+- Per-project lock at `<project_path>/.confirm_ui.lock` records pid, port,
+  instance id, and
+  `browser_url`. Cross-command liveness uses the lock-bound `/api/health`
+  identity (service, project, pid, and instance id), so PID namespaces and PID reuse
+  cannot create a false duplicate. Unreachable stale locks are overwritten.
 - Idle auto-shutdown after 900 s by default; `/api/shutdown` exits gracefully and releases the lock.
 - Stage-1 `GET /api/recommendations` embeds the server-built candidate catalog
   as top-level `template_options`. Its `/api/confirm` submission validates

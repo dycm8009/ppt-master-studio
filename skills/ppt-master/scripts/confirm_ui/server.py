@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 31151)
+Total output lines: 3238
+
 #!/usr/bin/env python3
 """
 PPT Master - Template and Strategist confirmation UI Server (Steps 3-4)
@@ -77,6 +80,7 @@ from server_common import (  # noqa: E402
     process_alive as _process_alive,
     read_lock as _read_lock,
     release_lock as _release_lock,
+    service_lock_reachable as _service_lock_reachable,
     validate_port as _validate_port,
 )
 
@@ -1128,12 +1132,16 @@ def _launch_background_server(
     return proc, port, log_path
 
 
-def _live_lock(lock_file: Path) -> Optional[dict]:
-    """Return a live lock; stale entries are overwritten by the recovered child."""
+def _live_lock(lock_file: Path, project_path: Path) -> Optional[dict]:
+    """Return a lock whose confirm service identity is reachable."""
     existing = _read_lock(lock_file)
     if not existing:
         return None
-    if _process_alive(_lock_pid(existing)):
+    if _service_lock_reachable(
+        existing,
+        service='confirm_ui',
+        project=project_path,
+    ):
         return existing
     return None
 
@@ -1549,119 +1557,7 @@ def _typography_error(
     if not require_sizes:
         return None
     sizes = typography.get('sizes')
-    if not isinstance(sizes, dict):
-        return f'{label}.sizes must be an object'
-    for role in _TYPOGRAPHY_SIZE_ROLES:
-        if not _positive_number(sizes.get(role)):
-            return f'{label}.sizes.{role} must be a positive number'
-    return None
-
-
-def _typography_signature(
-    typography: dict,
-    *,
-    main_language: object,
-) -> tuple[str, ...]:
-    """Return the language-relevant font choices that distinguish one candidate."""
-    english_primary = _is_english_language(main_language)
-    fields = ('primary',) if english_primary else ('primary', 'english')
-    values = []
-    for role in ('heading', 'body'):
-        font = typography[role]
-        for field in fields:
-            value = _typography_font_value(
-                font,
-                field,
-                english_primary=english_primary,
-            )
-            values.append(str(value).strip().casefold())
-    return tuple(values)
-
-
-def _typography_candidates_fixed_error(
-    candidates: list,
-    *,
-    main_language: object,
-) -> Optional[str]:
-    """Reject contradictions in an explicitly fixed typography contract."""
-    fixed = [
-        isinstance(candidate, dict) and candidate.get('fixed') is True
-        for candidate in candidates
-    ]
-    if any(fixed):
-        if not all(fixed):
-            return 'typography.fixed must be true on every candidate or omitted'
-        signatures = [
-            _typography_signature(
-                candidate,
-                main_language=main_language,
-            )
-            for candidate in candidates
-        ]
-        if any(signature != signatures[0] for signature in signatures[1:]):
-            return 'fixed typography candidates must repeat the same font combination'
-        return None
-    return None
-
-
-def _candidate_list(spec: object) -> list:
-    """Return candidates from the current or legacy recommendation shape."""
-    if not isinstance(spec, dict):
-        return []
-    candidates = spec.get('candidates')
-    if not isinstance(candidates, list):
-        candidates = spec.get('options')
-    return candidates if isinstance(candidates, list) else []
-
-
-def _stage2_design_directions_error(
-    recommendations: dict,
-    *,
-    main_language: object = '',
-) -> Optional[str]:
-    """Require three complete custom systems and a valid preferred direction."""
-    main_language = main_language or _recommendation_language(recommendations)
-    directions = recommendations.get('design_directions')
-    if isinstance(directions, dict):
-        candidates = _candidate_list(directions)
-        if len(candidates) != 3:
-            return 'Stage 2 design_directions must include exactly 3 candidates'
-        selected = directions.get('selected', 0)
-        if type(selected) is not int or not 0 <= selected < len(candidates):
-            return 'Stage 2 design_directions.selected must be an integer from 0 to 2'
-        typography_candidates = []
-        direction_ids = set()
-        for index, candidate in enumerate(candidates, start=1):
-            label = f'design_directions.candidates[{index - 1}]'
-            if not isinstance(candidate, dict):
-                return f'{label} must be an object'
-            direction_id = str(candidate.get('id') or '').strip()
-            if not direction_id:
-                return f'{label}.id must be non-empty'
-            if direction_id in direction_ids:
-                return f'{label}.id must be unique'
-            direction_ids.add(direction_id)
-            if not _localized_text_present(candidate, 'name'):
-                return f'{label} requires a non-empty localized name'
-            for field in ('mode', 'visual_style', 'icons'):
-                if not isinstance(candidate.get(field), str) or not candidate[field].strip():
-                    return f'{label}.{field} must be non-empty'
-            if candidate['mode'] != 'custom':
-                return f'{label}.mode must be custom'
-            if not _localized_text_present(candidate, 'mode_behavior'):
-                return f'{label}.mode=custom requires non-empty localized mode_behavior'
-            if candidate['visual_style'] != 'custom':
-                return f'{label}.visual_style must be custom'
-            if not _localized_text_present(candidate, 'visual_style_behavior'):
-                return (
-                    f'{label}.visual_style=custom requires non-empty localized '
-                    'visual_style_behavior'
-                )
-            error = _palette_error(candidate.get('color'), f'{label}.color')
-            if error:
-                return error
-            error = _typography_error(
-                candidate.get('typography'),
+    if not isinstance(sizes, dict)…1151 tokens truncated…andidate.get('typography'),
                 f'{label}.typography',
                 require_sizes=False,
                 main_language=main_language,
@@ -2270,8 +2166,11 @@ def _wait_only_for_result(
             return 1
 
         lock = _read_lock(lock_file)
-        pid = _lock_pid(lock)
-        if not pid or not _process_alive(pid):
+        if not _service_lock_reachable(
+            lock,
+            service='confirm_ui',
+            project=result_file.parent.parent,
+        ):
             logger.error('confirm server is no longer running before stage=%s was confirmed', target_stage)
             return 1
 
@@ -2335,7 +2234,11 @@ def _shutdown_existing(lock_file: Path) -> int:
         return 0
     pid = _lock_pid(existing)
     port = existing.get('port')
-    if not _process_alive(pid):
+    if not _service_lock_reachable(
+        existing,
+        service='confirm_ui',
+        project=lock_file.parent,
+    ):
         _clear_lock(lock_file)
         logger.info('confirm server already stopped; cleared stale lock')
         return 0
@@ -2352,14 +2255,32 @@ def _shutdown_existing(lock_file: Path) -> int:
         except OSError:
             pass  # server may already be exiting; fall through to the kill path
     for _ in range(20):  # up to ~2s for the graceful exit to land
-        if not _process_alive(pid):
+        if not _service_lock_reachable(
+            existing,
+            service='confirm_ui',
+            project=lock_file.parent,
+        ):
             break
         time.sleep(0.1)
-    if _process_alive(pid):
+    if _service_lock_reachable(
+        existing,
+        service='confirm_ui',
+        project=lock_file.parent,
+    ) and _process_alive(pid):
         try:
             os.kill(pid, signal.SIGTERM)
         except OSError:
             pass
+    if _service_lock_reachable(
+        existing,
+        service='confirm_ui',
+        project=lock_file.parent,
+    ):
+        logger.error(
+            'confirm server remains reachable at %s after shutdown request',
+            _lock_browser_url(existing) or 'its recorded URL',
+        )
+        return 1
     _clear_lock(lock_file)
     logger.info('confirm server stopped (pid=%s)', pid)
     return 0
@@ -2475,6 +2396,8 @@ def create_app(
     app.config['CONFIRM_DIR'] = confirm_dir
     app.config['LOCK_FILE'] = lock_file
     app.config['SERVER_PORT'] = server_port
+    lock = _read_lock(lock_file) if lock_file is not None else None
+    app.config['INSTANCE_ID'] = (lock or {}).get('instance_id')
     app.config['LAST_REQUEST_TIME'] = time.time()
 
     @app.before_request
@@ -2536,6 +2459,7 @@ def create_app(
             'status': 'ok',
             'service': 'confirm_ui',
             'pid': os.getpid(),
+            'instance_id': app.config.get('INSTANCE_ID'),
             'project': str(project_path),
             'recommendations': rec_ok,
             'stage': stage,
@@ -3047,11 +2971,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                 readiness_error,
             )
             return 1
-        if not _live_lock(lock_file):
+        if not _live_lock(lock_file, project_path):
             launch_error = _confirmation_launch_error(confirm_dir)
             if launch_error:
                 logger.error('%s', launch_error)
                 return 1
+            _clear_lock(lock_file)
             exact_port = args.port is not None
             recovery_port = (
                 args.port
@@ -3091,7 +3016,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.daemon:
         lock_file = project_path / LOCK_FILE_NAME
         existing = _read_lock(lock_file)
-        if existing and _process_alive(_lock_pid(existing)):
+        if _service_lock_reachable(
+            existing,
+            service='confirm_ui',
+            project=project_path,
+        ):
             existing_pid = existing.get('pid', '?')
             existing_port = existing.get('port', '?')
             logger.error(
@@ -3101,6 +3030,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 _lock_browser_url(existing) or 'the URL recorded in the project lock',
             )
             return 1
+        if existing:
+            _clear_lock(lock_file)
 
         confirm_dir = project_path / CONFIRM_DIR_NAME
         result_file = confirm_dir / RESULT_NAME
@@ -3133,9 +3064,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         logger.error('%s', exc)
         return 1
 
-    # Per-project mutual exclusion: refuse duplicate launches. Stale locks
-    # (dead pid) are overwritten by _claim_lock.
+    # Per-project mutual exclusion: refuse identity-verified duplicate launches.
+    # Unreachable locks are cleared before _claim_lock.
     lock_file = project_path / LOCK_FILE_NAME
+    existing = _read_lock(lock_file)
+    if _service_lock_reachable(
+        existing,
+        service='confirm_ui',
+        project=project_path,
+    ):
+        existing_pid = existing.get('pid', '?')
+        existing_port = existing.get('port', '?')
+        logger.error(
+            'confirm UI is already running for this project '
+            '(pid=%s, port=%s). Open %s, or run --shutdown',
+            existing_pid,
+            existing_port,
+            _lock_browser_url(existing) or 'the URL recorded in the project lock',
+        )
+        return 1
+    if existing:
+        _clear_lock(lock_file)
     existing = _claim_lock(lock_file, port, browser_url=_server_url(port))
     if existing:
         existing_pid = existing.get('pid', '?')
