@@ -12,6 +12,7 @@ Examples:
     python3 scripts/svg_editor/server.py projects/my-project
     python3 scripts/svg_editor/server.py projects/my-project --port 8080
     python3 scripts/svg_editor/server.py projects/my-project --live
+    python3 scripts/svg_editor/server.py projects/my-project --open-local-browser
 
 Dependencies:
     flask>=3.0.0
@@ -63,10 +64,13 @@ from console_encoding import configure_utf8_stdio  # noqa: E402
 from resource_paths import icon_search_dirs_for_project  # noqa: E402
 from slide_roster import discover_slide_svgs  # noqa: E402
 from server_common import (  # noqa: E402
+    BIND_HOST,
     claim_lock as _claim_lock,
     clear_lock as _clear_lock,
+    cloud_browser_url as _cloud_browser_url,
     find_free_port as _find_free_port,
     lock_pid as _lock_pid,
+    loopback_url as _loopback_url,
     popen_detached as _popen_detached,
     process_alive as _process_alive,
     read_lock as _read_lock,
@@ -113,14 +117,12 @@ _LIST_CACHE: dict = {}  # path -> (mtime, annotation_count_on_disk)
 # Keep live preview on a separate range from Confirm UI so a stale preview tab
 # cannot send ``/api/shutdown`` to a later Confirm UI process.
 DEFAULT_PORT = 6060
-PUBLIC_HOST = '127.0.0.1'
 STARTUP_TIMEOUT = 15
 
 
 def _server_url(port: int, path: str = '') -> str:
-    """Return the loopback URL shown to users and used by readiness probes."""
-    suffix = path if path.startswith('/') or not path else f'/{path}'
-    return f'http://{PUBLIC_HOST}:{port}{suffix}'
+    """Return the ChatGPT Work Cloud Browser URL shown to users."""
+    return _cloud_browser_url(port, path)
 
 
 def _xml_attr(value: object) -> str:
@@ -1076,7 +1078,7 @@ def _shutdown_existing(project_path: Path) -> int:
     if port:
         try:
             req = urllib.request.Request(
-                _server_url(port, '/api/shutdown'),
+                _loopback_url(port, '/api/shutdown'),
                 data=b'{"reason": "cli-shutdown"}',
                 headers={'Content-Type': 'application/json'},
                 method='POST',
@@ -1107,7 +1109,7 @@ def _wait_for_ready(
 ) -> bool:
     """Wait until this project's detached live-preview server responds."""
     deadline = time.time() + timeout
-    health_url = _server_url(port, '/api/health')
+    health_url = _loopback_url(port, '/api/health')
     last_error = ''
     while time.time() < deadline:
         if proc.poll() is not None:
@@ -1188,8 +1190,9 @@ def _reuse_running_server(
         'live preview already running for this project (pid=%s), reusing: %s',
         pid, url,
     )
-    if open_browser and not _open_browser(url):
-        logger.info('browser did not auto-open; open %s manually', url)
+    local_url = _loopback_url(port)
+    if open_browser and not _open_browser(local_url):
+        logger.info('local browser did not auto-open; open %s manually', local_url)
     return 0
 
 
@@ -1214,7 +1217,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=f'Exact port to listen on (default: first free port from {DEFAULT_PORT})',
     )
-    parser.add_argument('--no-browser', action='store_true', help='Do not auto-open browser')
+    browser_group = parser.add_mutually_exclusive_group()
+    browser_group.add_argument(
+        '--open-local-browser',
+        action='store_true',
+        help='Open the reported URL with a local browser process (Cloud Browser is the default)',
+    )
+    browser_group.add_argument(
+        '--no-browser',
+        action='store_true',
+        help='Compatibility flag; keep local browser auto-open disabled',
+    )
     parser.add_argument(
         '--daemon',
         action='store_true',
@@ -1275,7 +1288,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if legacy_existing:
         return _reuse_running_server(
             legacy_existing,
-            open_browser=not args.no_browser,
+            open_browser=args.open_local_browser,
             requested_port=args.port,
         )
 
@@ -1287,7 +1300,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         if existing and _process_alive(_lock_pid(existing)):
             return _reuse_running_server(
                 existing,
-                open_browser=not args.no_browser,
+                open_browser=args.open_local_browser,
                 requested_port=args.port,
             )
 
@@ -1337,8 +1350,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 1
         logger.info('started live preview in background: %s (pid=%s)', url, proc.pid)
         logger.info('log: %s', log_path)
-        if not args.no_browser and not _open_browser(url):
-            logger.info('browser did not auto-open; open %s manually', url)
+        local_url = _loopback_url(port)
+        if args.open_local_browser and not _open_browser(local_url):
+            logger.info('local browser did not auto-open; open %s manually', local_url)
         return 0
 
     # Pick a free port: another project's preview/confirm server may already
@@ -1360,11 +1374,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     except OSError as exc:
         logger.error('cannot create live preview runtime directory: %s (%s)', runtime_dir, exc)
         return 1
-    existing = _claim_lock(lock_file, port)
+    existing = _claim_lock(lock_file, port, browser_url=_server_url(port))
     if existing:
         return _reuse_running_server(
             existing,
-            open_browser=not args.no_browser,
+            open_browser=args.open_local_browser,
             requested_port=args.port,
         )
     # atexit covers normal interpreter shutdown (Ctrl+C / SystemExit);
@@ -1399,8 +1413,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     url = _server_url(port)
-    if not args.no_browser:
-        _open_browser_async(url)
+    if args.open_local_browser:
+        _open_browser_async(_loopback_url(port))
 
     mode = "live preview (auto-startup)" if args.live else "live preview"
     svg_count = len(list(svg_output.glob('*.svg')))
@@ -1408,7 +1422,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     logger.info('project: %s', project_path)
     logger.info('svg_output: %s (%d slides)', svg_output, svg_count)
     logger.info('idle timeout: %ds (0 = disabled)', idle_timeout)
-    app.run(host=PUBLIC_HOST, port=port, debug=False)
+    app.run(host=BIND_HOST, port=port, debug=False)
     return 0
 
 

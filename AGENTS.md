@@ -76,7 +76,7 @@ python3 skills/ppt-master/scripts/icon_sync.py <project_path> <lib/name> [<lib/n
 python3 skills/ppt-master/scripts/sound_sync.py list [--query term]
 python3 skills/ppt-master/scripts/sound_sync.py <project_path> <namespace>/<id>...
 
-python3 skills/ppt-master/scripts/confirm_ui/server.py <project_path> --daemon
+python3 skills/ppt-master/scripts/confirm_ui/server.py <project_path> --daemon --no-browser
 python3 skills/ppt-master/scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage1
 
 # Image tools and SVG quality check
@@ -88,7 +88,7 @@ python3 skills/ppt-master/scripts/image_gen.py --render-md <project_path>/images
 python3 skills/ppt-master/scripts/image_gen.py "prompt" --aspect_ratio 16:9 --image_size 1K -o <project_path>/images
 # Spot illustrations — slice one AI grid sheet into individual elements (see image-generator.md §4.3):
 python3 skills/ppt-master/scripts/slice_images.py <project_path>/images/<sheet>.png --grid RxC --names a,b,c --trim --alpha --bg KEY_HEX_FROM_PROMPT --strict-alpha
-python3 skills/ppt-master/scripts/svg_editor/server.py <project_path> --live --daemon
+python3 skills/ppt-master/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
 python3 skills/ppt-master/scripts/svg_quality_checker.py <project_path>
 # Shared create-template coordinate compaction before template validation
 python3 skills/ppt-master/scripts/compact_svg_coordinates.py "<template_workspace>/templates" --inplace --keep-native-frames

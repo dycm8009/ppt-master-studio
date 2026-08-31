@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-PPT Master - Local Preview Server Helpers
+PPT Master - Preview Server Helpers
 
-Shared per-project mutual-exclusion (lock) and liveness helpers for the local
-Flask preview servers (`svg_editor/server.py`, `confirm_ui/server.py`). Each
-server keeps its own lock filename and Flask app; this module owns only the
-cross-platform process-liveness check and the claim/read/release lock logic so
+Shared network, per-project mutual-exclusion (lock), and liveness helpers for
+the Flask preview servers (`svg_editor/server.py`, `confirm_ui/server.py`). Each
+server keeps its own lock filename and Flask app; this module owns their
+ChatGPT Work bind/browser URL split plus common process and lock behavior so
 the two servers cannot drift apart.
 
 Usage:
-    from server_common import find_free_port, validate_port
+    from server_common import cloud_browser_url, find_free_port, validate_port
 
 Dependencies:
     None (only uses standard library)
@@ -28,6 +28,26 @@ from workflow_transcript import DISABLE_TRANSCRIPT_ENV
 
 MIN_PORT = 1
 MAX_PORT = 65535
+BIND_HOST = '0.0.0.0'
+LOOPBACK_HOST = '127.0.0.1'
+CLOUD_BROWSER_HOST = 'terminal.local'
+
+
+def _http_url(host: str, port: int, path: str = '') -> str:
+    """Return an HTTP URL for one validated preview port and optional path."""
+    validated_port = validate_port(port)
+    suffix = path if path.startswith('/') or not path else f'/{path}'
+    return f'http://{host}:{validated_port}{suffix}'
+
+
+def cloud_browser_url(port: int, path: str = '') -> str:
+    """Return the ChatGPT Work Cloud Browser URL for a preview endpoint."""
+    return _http_url(CLOUD_BROWSER_HOST, port, path)
+
+
+def loopback_url(port: int, path: str = '') -> str:
+    """Return the process-local URL used by readiness and shutdown calls."""
+    return _http_url(LOOPBACK_HOST, port, path)
 
 
 def validate_port(port: int) -> int:
@@ -39,7 +59,7 @@ def validate_port(port: int) -> int:
     return port
 
 
-def find_free_port(preferred: int, host: str = '127.0.0.1', span: int = 50) -> int:
+def find_free_port(preferred: int, host: str = BIND_HOST, span: int = 50) -> int:
     """Return the first bindable port from ``preferred`` through its scan span.
 
     The scan remains sequential so callers can keep 5050 as their preferred
@@ -197,20 +217,41 @@ def lock_pid(lock: Optional[dict]) -> int:
     return 0
 
 
-def claim_lock(lock_file: Path, port: int) -> Optional[dict]:
+def lock_browser_url(lock: Optional[dict]) -> Optional[str]:
+    """Return a stored or port-derived Cloud Browser URL from a lock dict."""
+    if not lock:
+        return None
+    stored_url = lock.get('browser_url')
+    if isinstance(stored_url, str) and stored_url.strip():
+        return stored_url.strip()
+    raw_port = lock.get('port', 0)
+    try:
+        port = validate_port(int(raw_port))
+    except (TypeError, ValueError):
+        return None
+    return cloud_browser_url(port)
+
+
+def claim_lock(
+    lock_file: Path,
+    port: int,
+    *,
+    browser_url: Optional[str] = None,
+) -> Optional[dict]:
     """Try to claim the per-project preview slot.
 
     Returns ``None`` on success. If another live process already holds the
     slot, returns the existing lock dict (caller surfaces it as an error).
-    A stale lock (pointing at a dead pid) is silently overwritten.
+    A stale lock (pointing at a dead pid) is silently overwritten. New locks
+    may also carry the exact Cloud Browser URL reported by the launcher.
     """
     existing = read_lock(lock_file)
     if existing and process_alive(lock_pid(existing)):
         return existing
-    lock_file.write_text(
-        json.dumps({'pid': os.getpid(), 'port': port}),
-        encoding='utf-8',
-    )
+    payload = {'pid': os.getpid(), 'port': port}
+    if browser_url:
+        payload['browser_url'] = browser_url
+    lock_file.write_text(json.dumps(payload), encoding='utf-8')
     return None
 
 

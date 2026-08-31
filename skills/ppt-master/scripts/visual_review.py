@@ -14,7 +14,7 @@ tofu boxes for any deck whose font-family list relies on system fallback.
 Usage:
     python3 scripts/visual_review.py <project_path>
     python3 scripts/visual_review.py <project_path> --pages 02 03
-    python3 scripts/visual_review.py <project_path> --server-url http://localhost:5050
+    python3 scripts/visual_review.py <project_path> --server-url http://127.0.0.1:6060
 
 Exit codes (per references/visual-review.md §7):
     0 — all requested pages rendered
@@ -43,7 +43,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from console_encoding import configure_utf8_stdio
-from server_common import lock_pid, process_alive, read_lock
+from server_common import lock_pid, loopback_url, process_alive, read_lock
 from slide_roster import discover_slide_svgs
 from svg_to_pptx.canvas_contract import parse_project_svg_root
 
@@ -268,7 +268,7 @@ def discover_server_url(project_path: Path) -> str:
         except (TypeError, ValueError):
             port = 0
         if 1 <= port <= 65535:
-            return f'http://127.0.0.1:{port}'
+            return loopback_url(port)
     raise RuntimeError(
         f'no running live-preview server recorded for project: {project_path}'
     )

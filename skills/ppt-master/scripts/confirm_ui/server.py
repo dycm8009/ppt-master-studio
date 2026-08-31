@@ -9,8 +9,9 @@ stage1-confirmed ``result.json`` in one request. After the agent applies the
 choice and completes ``template_handoff.json``, final Stage 2 confirms the deck
 solution and production plan.
 
-This is the default confirmation surface. The chat fallback is used only when
-the user explicitly requests chat-only confirmation or the browser launch
+This is the default confirmation surface. ChatGPT Work opens the reported
+``terminal.local`` URL in Cloud Browser. The chat fallback is used only when
+the user explicitly requests chat-only confirmation or Cloud Browser access
 fails; it preserves the same staged semantics.
 
 See scripts/docs/confirm_ui.md for the round-trip data contract and schema.
@@ -22,7 +23,8 @@ Examples:
     python3 scripts/confirm_ui/server.py projects/my-project
     python3 scripts/confirm_ui/server.py projects/my-project --port 5051
     python3 scripts/confirm_ui/server.py projects/my-project --no-browser
-    python3 scripts/confirm_ui/server.py projects/my-project --daemon
+    python3 scripts/confirm_ui/server.py projects/my-project --open-local-browser
+    python3 scripts/confirm_ui/server.py projects/my-project --daemon --no-browser
     python3 scripts/confirm_ui/server.py projects/my-project --wait-only --wait-stage stage1
     python3 scripts/confirm_ui/server.py projects/my-project --complete-template-selection
     python3 scripts/confirm_ui/server.py projects/my-project --reset-template-selection
@@ -63,10 +65,14 @@ from language_tags import (  # noqa: E402
     normalize_language_tag,
 )
 from server_common import (  # noqa: E402
+    BIND_HOST,
     claim_lock as _claim_lock,
     clear_lock as _clear_lock,
+    cloud_browser_url as _cloud_browser_url,
     find_free_port as _find_free_port,
+    lock_browser_url as _lock_browser_url,
     lock_pid as _lock_pid,
+    loopback_url as _loopback_url,
     popen_detached as _popen_detached,
     process_alive as _process_alive,
     read_lock as _read_lock,
@@ -134,7 +140,6 @@ _ICON_PREVIEW_SAMPLES = {
 # base range so stale preview tabs cannot address a later Confirm UI process.
 # Concurrent Confirm UI sessions advance while explicit ``--port`` remains exact.
 DEFAULT_PORT = 5050
-PUBLIC_HOST = '127.0.0.1'
 STARTUP_TIMEOUT = 10
 
 # Default --wait budget, kept just under the 600s Bash-tool ceiling so the
@@ -1036,9 +1041,8 @@ def _confirmation_launch_error(confirm_dir: Path) -> Optional[str]:
 
 
 def _server_url(port: int, path: str = '') -> str:
-    """Return the loopback URL shown to users and used by readiness probes."""
-    suffix = path if path.startswith('/') or not path else f'/{path}'
-    return f'http://{PUBLIC_HOST}:{port}{suffix}'
+    """Return the ChatGPT Work Cloud Browser URL shown to users."""
+    return _cloud_browser_url(port, path)
 
 
 def _wait_for_server_ready(
@@ -1050,7 +1054,7 @@ def _wait_for_server_ready(
     """Wait until this project's detached confirm server is accepting requests."""
     deadline = time.time() + timeout
     last_error = ''
-    health_url = _server_url(port, '/api/health')
+    health_url = _loopback_url(port, '/api/health')
     while time.time() < deadline:
         returncode = proc.poll()
         if returncode is not None:
@@ -1120,7 +1124,7 @@ def _launch_background_server(
     url = _server_url(port)
     logger.info('started confirm UI in background: %s (pid=%s)', url, proc.pid)
     if open_browser:
-        webbrowser.open(url)
+        webbrowser.open(_loopback_url(port))
     return proc, port, log_path
 
 
@@ -2339,7 +2343,7 @@ def _shutdown_existing(lock_file: Path) -> int:
     if port:
         try:
             req = urllib.request.Request(
-                f'http://127.0.0.1:{port}/api/shutdown',
+                _loopback_url(port, '/api/shutdown'),
                 data=b'{"reason": "step4-cleanup"}',
                 headers={'Content-Type': 'application/json'},
                 method='POST',
@@ -2903,7 +2907,17 @@ def build_parser() -> argparse.ArgumentParser:
         '--port', type=int, default=None,
         help=f'Exact port to listen on (default: first free port from {DEFAULT_PORT})',
     )
-    parser.add_argument('--no-browser', action='store_true', help='Do not auto-open browser')
+    browser_group = parser.add_mutually_exclusive_group()
+    browser_group.add_argument(
+        '--open-local-browser',
+        action='store_true',
+        help='Open the reported URL with a local browser process (Cloud Browser is the default)',
+    )
+    browser_group.add_argument(
+        '--no-browser',
+        action='store_true',
+        help='Compatibility flag; keep local browser auto-open disabled',
+    )
     parser.add_argument(
         '--daemon', action='store_true',
         help='Start the server in the background; combine with --wait to block until confirmation',
@@ -3055,8 +3069,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             except RuntimeError as exc:
                 logger.error('%s', exc)
                 return 1
-            if actual_port != recovery_port and not args.no_browser:
-                webbrowser.open(_server_url(actual_port))
+            if actual_port != recovery_port and args.open_local_browser:
+                webbrowser.open(_loopback_url(actual_port))
             logger.info(
                 'recovered confirm UI for wait-only at %s; the browser polling should resume',
                 _server_url(actual_port),
@@ -3082,8 +3096,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             existing_port = existing.get('port', '?')
             logger.error(
                 'confirm UI is already running for this project '
-                '(pid=%s, port=%s). Open http://%s:%s',
-                existing_pid, existing_port, PUBLIC_HOST, existing_port,
+                '(pid=%s, port=%s). Open %s',
+                existing_pid, existing_port,
+                _lock_browser_url(existing) or 'the URL recorded in the project lock',
             )
             return 1
 
@@ -3097,7 +3112,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 preferred_port=args.port if args.port is not None else DEFAULT_PORT,
                 exact_port=args.port is not None,
                 idle_timeout=args.timeout,
-                open_browser=not args.no_browser,
+                open_browser=args.open_local_browser,
             )
         except RuntimeError as exc:
             logger.error('%s', exc)
@@ -3121,14 +3136,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Per-project mutual exclusion: refuse duplicate launches. Stale locks
     # (dead pid) are overwritten by _claim_lock.
     lock_file = project_path / LOCK_FILE_NAME
-    existing = _claim_lock(lock_file, port)
+    existing = _claim_lock(lock_file, port, browser_url=_server_url(port))
     if existing:
         existing_pid = existing.get('pid', '?')
         existing_port = existing.get('port', '?')
         logger.error(
             'confirm UI is already running for this project '
-            '(pid=%s, port=%s). Open http://%s:%s, or run: kill %s',
-            existing_pid, existing_port, PUBLIC_HOST, existing_port, existing_pid,
+            '(pid=%s, port=%s). Open %s, or run: kill %s',
+            existing_pid, existing_port,
+            _lock_browser_url(existing) or 'the URL recorded in the project lock',
+            existing_pid,
         )
         return 1
     atexit.register(_release_lock, lock_file)
@@ -3149,13 +3166,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     url = _server_url(port)
-    if not args.no_browser:
-        _open_browser_async(url)
+    if args.open_local_browser:
+        _open_browser_async(_loopback_url(port))
 
     logger.info('running at %s', url)
     logger.info('project: %s', project_path)
     logger.info('idle timeout: %ds (0 = disabled)', args.timeout)
-    app.run(host=PUBLIC_HOST, port=port, debug=False)
+    app.run(host=BIND_HOST, port=port, debug=False)
     return 0
 
 

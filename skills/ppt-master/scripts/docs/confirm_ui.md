@@ -82,7 +82,8 @@ starts, or after it times out while the server remains live:
 
 **Always-on Stage-1 chat handoff**: After writing `template_options.json` and
 template-independent `recommendations.stage1.json`, launch the healthy daemon
-without `--wait`. Immediately post its actual URL plus one compact localized
+with `--no-browser` and without `--wait`. Open its exact reported URL in Cloud
+Browser. Immediately post that URL plus one compact localized
 summary of the current communication recommendation and template choice state:
 audience, communication intent, audience outcome, core message, delivery
 context, artifact afterlife, `content_divergence`, canvas, and whether the
@@ -102,26 +103,27 @@ the same combined Stage-1 items as open chat questions and wait explicitly.
 The following launch and wait commands belong to the **UI branch only**:
 
 ```bash
-python3 scripts/confirm_ui/server.py <project_path> --daemon         # launch combined Stage 1
+python3 scripts/confirm_ui/server.py <project_path> --daemon --no-browser  # launch combined Stage 1
 python3 scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage1  # communication + template selection
 python3 scripts/confirm_ui/server.py <project_path> --complete-template-selection # after Stage-1 free-design closure / template install
 python3 scripts/confirm_ui/server.py <project_path> --wait-only       # current final Stage 2
-python3 scripts/confirm_ui/server.py <project_path> --daemon --port 5051
+python3 scripts/confirm_ui/server.py <project_path> --daemon --port 5051 --no-browser
 python3 scripts/confirm_ui/server.py <project_path> --no-browser
+python3 scripts/confirm_ui/server.py <project_path> --open-local-browser
 python3 scripts/confirm_ui/server.py <project_path> --timeout 0   # disable idle auto-shutdown
 python3 scripts/confirm_ui/server.py <project_path> --reset-template-selection # clear prior template sidecars before a fresh UI run
 python3 scripts/confirm_ui/server.py <project_path> --shutdown    # Step 4 cleanup (idempotent)
 ```
 
-- Without `--port`, binds the first free port from `127.0.0.1:5050`; the launch log prints the actual URL. `--port N` is exact and fails when unavailable. Auto-open is suppressed by `--no-browser`.
-- In `--daemon` mode the launcher starts the child with browser opening suppressed, then accepts readiness only when `GET /api/health` identifies this confirm service, project, and child process. It opens the printed `http://127.0.0.1:<port>` URL only after that check.
-- Confirm UI and live preview prefer the same memorable base port but keep separate processes and project-local locks (`.confirm_ui.lock` vs `live_preview/lock.json`). Normal Step 4 cleanup releases the confirm port before Step 6; concurrent projects may use different ports.
+- Without `--port`, binds `0.0.0.0` on the first free port from `5050`; the launch log prints the exact `http://terminal.local:<port>` Cloud Browser URL. `--port N` is exact and fails when unavailable. Local browser auto-open is disabled by default; `--open-local-browser` is an explicit non-Work opt-in, and `--no-browser` remains a compatibility flag.
+- In `--daemon` mode the launcher starts the child with browser opening suppressed, then accepts readiness only when an internal `GET http://127.0.0.1:<port>/api/health` identifies this confirm service, project, and child process. After that check, the active agent opens the reported `terminal.local` URL in Cloud Browser.
+- Confirm UI and live preview use separate base ranges (`5050` and `6060`) plus separate project-local locks (`.confirm_ui.lock` vs `live_preview/lock.json`). Normal Step 4 cleanup releases the confirm port before Step 6; concurrent projects may use different ports.
 - `--daemon` starts the Flask process in the background and returns after the health check. Every Default UI run launches directly into combined Stage 1 and keeps the same process live through final Stage 2. The wait budget defaults to **590 s** (`--wait-timeout`); on timeout the detached server remains live, and the caller re-checks both Stage-1 receipts before chat fallback.
 - `--wait-only` attaches to the page opened by `--daemon` and blocks until the requested receipt. If it is already persisted, the command returns before recovery, so a fast submit between launch, chat handoff, and wait is not lost. Otherwise, if the recorded server died, it restarts on the recorded/default port. Use `stage1` for the combined communication/template submission and the default/final wait for Stage 2.
 - `--complete-template-selection` is agent-only. It validates the Stage-1 sidecar and writes the bound `template_handoff.json`; template mode additionally requires at least one project-local `templates/design_spec.<kind>.<id>.md`. Run it after installation/free-design closure and before writing Stage 2. `--reset-template-selection` removes exactly `template_options.json`, `template_selection.json`, and `template_handoff.json`; it does not alter Strategist files, installed template content, or `result.json`. The old `--*-template-phase` names are not aliases.
 - `--shutdown` stops a confirm server left running for this project and exits — **idempotent** (a no-op when nothing is running). Tries a graceful `/api/shutdown`, falls back to killing the recorded pid, then clears the lock. Generate Step 4 runs this on every path so the selected port is released before live preview starts.
 - Every fresh UI run starts with `--reset-template-selection`, then writes valid `<project_path>/confirm_ui/template_options.json` and a newer `recommendations.stage1.json`; `explicit_workspace_roots` is an empty array when no exact root was supplied. Stage 1 writes the bound selection and communication result together. Stage 2 is exposed only when the matching handoff is newer than that selection and its recommendation is newer than the handoff. `--shutdown` needs neither input.
-- Per-project lock at `<project_path>/.confirm_ui.lock` — duplicate launches are refused; stale locks (dead pid) are overwritten.
+- Per-project lock at `<project_path>/.confirm_ui.lock` records pid, port, and `browser_url`; duplicate launches are refused and stale locks (dead pid) are overwritten.
 - Idle auto-shutdown after 900 s by default; `/api/shutdown` exits gracefully and releases the lock.
 - Stage-1 `GET /api/recommendations` embeds the server-built candidate catalog
   as top-level `template_options`. Its `/api/confirm` submission validates

@@ -358,9 +358,13 @@ candidate content, then launch the combined Stage-1 page and post
 `confirm_ui.md`'s required communication + template-choice summary/fallback:
 
 ```bash
-python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --daemon
+python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --daemon --no-browser
 python3 ${SKILL_DIR}/scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage1
 ```
+
+After the daemon reports its exact `http://terminal.local:<port>` URL, open
+that URL in Cloud Browser before posting the required Stage-1 chat handoff. Do
+not substitute `127.0.0.1`, `localhost`, or an inferred default port.
 
 **Hard rule — Stage 1 is intermediate**: exit `0` from this first wait is an
 instruction to continue, not a route-completion condition. Do not send a final
@@ -658,9 +662,10 @@ decision nor locks geometry/native readiness.
 
 **Live Preview Auto-Startup (Mandatory)**: before the first SVG, automatically start the browser editor in live mode and keep it running continuously through Executor + Step 7 export:
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --daemon
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
 ```
-- Start when Executor begins; `svg_output/` may be empty. Default: first free port from `5050`; `--port N`: strict bind. Read the actual URL from output or `<project_path>/live_preview/lock.json`.
+- Start when Executor begins; `svg_output/` may be empty. Default: first free port from `6060`; `--port N`: strict bind. Read the exact `browser_url` from output or `<project_path>/live_preview/lock.json`.
+- Open that exact `http://terminal.local:<port>` URL in Cloud Browser. The Flask process listens on `0.0.0.0`; `127.0.0.1` remains internal-only for readiness, shutdown, and renderer calls.
 - Before the first SVG, report that URL or the launch failure; never claim an unavailable preview.
 - Run it as a long-running side process/session; do not wait for it to exit before generating SVG pages. Do not wait for user confirmation after startup.
 - **Service must keep running** until one of: (a) the user clicks **Exit preview** in the browser, or (b) the user explicitly asks in chat to stop it. Generation continues even if the user closes the editor.
