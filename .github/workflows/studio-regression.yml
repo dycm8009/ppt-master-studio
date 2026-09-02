@@ -37,6 +37,8 @@ jobs:
             studio/host/cloudflare/hosted_confirm_bridge.py \
             studio/host/cloudflare/hosted_editor_bridge.py \
             studio/host/cloudflare/test_confirm_return.py \
+            skills/ppt-master/scripts/deck_review_handoff.py \
+            studio/tests/deck_review_handoff_test.py \
             studio/tests/runtime_bundle_headless_test.py \
             studio/tests/smoke_test.py
 
@@ -45,6 +47,9 @@ jobs:
 
       - name: Validate extracted Runtime without Flask
         run: python studio/tests/runtime_bundle_headless_test.py
+
+      - name: Validate framework-free Deck Review without site packages
+        run: python -S studio/tests/deck_review_handoff_test.py
 
       - name: Validate direct launch and copied return without Flask
         working-directory: studio/host/cloudflare
@@ -90,6 +95,7 @@ jobs:
               unicode_info=z.getinfo('skills/ppt-master/templates/brands/中国电信/templates/design_spec.md')
           required={
               'skills/ppt-master/SKILL.md',
+              'skills/ppt-master/scripts/deck_review_handoff.py',
               'studio/host/chatgpt/ENTRYPOINT.md',
               'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md',
               'studio/host/cloudflare/HOSTED_UI.json',
