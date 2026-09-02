@@ -51,13 +51,27 @@ Do not attempt to install Flask for Hosted Confirm. A missing Flask package is n
 
 The browser bootstrap erases its bearer fragment before entering `/s/<session>`, and confirmation leaves the visible URL short. Never claim that Cloudflare has fed a decision back to ChatGPT merely because the page says `captured-not-validated`; feedback is complete only after a successful pull/apply or after the copied JSON has passed local Harness validation. Do not ask the user to copy a token, long JSON URL, or confirmation JSON when automatic pull has actually succeeded; otherwise use the explicit **Copy confirmation JSON** fallback and never ask them to copy the bootstrap URL itself.
 
-### Executor Live Preview / Deck Review — Cloudflare-hosted official SVG Editor
+### Executor Live Preview — Cloudflare-hosted official SVG Editor
 
 The official Harness still owns Executor Live Preview and its local `skills/ppt-master/scripts/svg_editor/server.py` behavior. When the execution Runtime actually has outbound HTTPS, `studio/host/cloudflare/hosted_editor_bridge.py` may mirror current `svg_output/`, `images/`, and `assets/` to the immutable commit-bound Worker so the user can operate the **official pinned SVG Editor frontend** remotely.
 
 Remote edits and annotations are only `captured-not-applied`. Pull them back through the bridge and replay them through the pinned local official SVG Editor API; only the local official server may write authoritative `svg_output`. If the remote session is still open, resync the locally applied result so the same page refreshes from authority.
 
 If Runtime outbound HTTPS is unavailable, do not claim that the Hosted SVG Editor is synchronized and do not expose a stale/test Hosted editor. Preserve the official local Live Preview behavior and continue under the official route's own failure/fallback semantics.
+
+### Deck Review — framework-free actual-SVG handoff
+
+For `Generate PPTX — ordinary Default`, after the current final SVG quality report passes and before Step 7 export, use the pinned Harness Deck Review stage. Run:
+
+`python3 "${SKILL_DIR}/scripts/deck_review_handoff.py" build <project_path>`
+
+This produces `<project_path>/live_preview/deck_review.html`, a self-contained review page that embeds sanitized copies of the actual final SVG files. It does **not** render screenshots and does not require Flask, localhost HTTP, Cloudflare, or Runtime outbound network. Present that HTML through the host's normal user-accessible file transport.
+
+The user must explicitly review every slide as `通过` or `需要修改`. The page must remain open after completion and expose the final `ppt-master-static-deck-review-response/v1` JSON for copying. Materialize the copied JSON unchanged and apply it with:
+
+`python3 "${SKILL_DIR}/scripts/deck_review_handoff.py" apply-response <project_path> --response-file <response.json>`
+
+Only a successful pinned-Harness receipt with `result: approved` and `changes_count: 0` for the current `svg_roster_sha256` closes the Deck Review Gate. `changes-requested` returns to Executor; after supported changes are made, rerun final SVG quality, reconcile Speaker Notes if enabled, rebuild Deck Review, and wait for a new user response because the roster hash has changed. Never reuse an old review receipt after SVG mutation and never self-confirm this gate.
 
 There is **no separate Studio Motion Review page**. Motion remains entirely under the official Harness and appears only when its official route requires it.
 

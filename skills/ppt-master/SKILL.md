@@ -67,6 +67,7 @@ never compete with it.
 5. **No speculative execution** — Do not prepare later-phase artifacts before their owning step.
 6. **Deterministic routing** — Do not add a route-choice question when [`routing.md`](workflows/routing.md) resolves the request. If a route prerequisite is missing, state it and stop that route.
 7. **Owning-source recovery** — On failure, repair or regenerate the owning source artifact and resume from the route's declared pointer. Do not silently downgrade a required artifact.
+8. **Default Generate Deck Review** — For `Generate PPTX — ordinary Default`, after the current final SVG quality report passes and before Step 7 export, read and run [`workflows/stages/deck-review.md`](workflows/stages/deck-review.md) as a `⛔ BLOCKING` human gate. Export is permitted only when the pinned [`scripts/deck_review_handoff.py`](scripts/deck_review_handoff.py) `apply-response` receipt has `result: approved` and `changes_count: 0` for the current SVG roster. Any requested changes return to Executor, require the route's final SVG quality gate to pass again, require Speaker Notes reconciliation when enabled, and require a rebuilt Deck Review with the new roster hash. Deck Review uses the actual SVG pages and must not require Flask, a localhost server, or runtime network.
 
 ## Global Communication Rules
 
