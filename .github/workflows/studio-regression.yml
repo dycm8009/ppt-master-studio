@@ -36,9 +36,17 @@ jobs:
             studio/host/cloudflare/hosted_confirm_handoff.py \
             studio/host/cloudflare/hosted_confirm_bridge.py \
             studio/host/cloudflare/hosted_editor_bridge.py \
+            studio/host/cloudflare/interaction_status.py \
             studio/host/cloudflare/test_confirm_return.py \
             skills/ppt-master/scripts/deck_review_handoff.py \
+            skills/ppt-master/scripts/storyboard_handoff.py \
+            skills/ppt-master/experiments/representative_calibration.py \
+            skills/ppt-master/experiments/semantic_review.py \
             studio/tests/deck_review_handoff_test.py \
+            studio/tests/storyboard_handoff_test.py \
+            studio/tests/interaction_status_test.py \
+            studio/tests/representative_calibration_test.py \
+            studio/tests/semantic_review_test.py \
             studio/tests/runtime_bundle_headless_test.py \
             studio/tests/smoke_test.py
 
@@ -50,6 +58,18 @@ jobs:
 
       - name: Validate framework-free Deck Review without site packages
         run: python -S studio/tests/deck_review_handoff_test.py
+
+      - name: Validate read-only Storyboard projection without site packages
+        run: python -S studio/tests/storyboard_handoff_test.py
+
+      - name: Validate truthful interaction status projection without site packages
+        run: python -S studio/tests/interaction_status_test.py
+
+      - name: Validate representative-page calibration experiment
+        run: python -S studio/tests/representative_calibration_test.py
+
+      - name: Validate semantic-review experiment
+        run: python -S studio/tests/semantic_review_test.py
 
       - name: Validate direct launch and copied return without Flask
         working-directory: studio/host/cloudflare
@@ -96,6 +116,7 @@ jobs:
           required={
               'skills/ppt-master/SKILL.md',
               'skills/ppt-master/scripts/deck_review_handoff.py',
+              'skills/ppt-master/scripts/storyboard_handoff.py',
               'studio/host/chatgpt/ENTRYPOINT.md',
               'studio/enforcement/PPT_MASTER_HOST_CAPABILITY_RULES.md',
               'studio/host/cloudflare/HOSTED_UI.json',
@@ -103,6 +124,7 @@ jobs:
               'studio/host/cloudflare/hosted_confirm_handoff.py',
               'studio/host/cloudflare/hosted_confirm_bridge.py',
               'studio/host/cloudflare/hosted_editor_bridge.py',
+              'studio/host/cloudflare/interaction_status.py',
           }
           assert required <= names
           assert unicode_info.flag_bits & 0x800
