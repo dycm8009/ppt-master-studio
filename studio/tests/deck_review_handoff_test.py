@@ -23,18 +23,20 @@ def main() -> int:
         project = Path(tmp)
         out = project / "svg_output"
         out.mkdir()
-        for n, fill in ((1, "#111111"), (2, "#222222")):
-            (out / f"P{n:02d}.svg").write_text(
+        for number, fill in ((1, "#111111"), (2, "#222222")):
+            (out / f"P{number:02d}.svg").write_text(
                 f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">'
                 f'<rect width="1280" height="720" fill="{fill}"/>'
-                f'<text x="80" y="120" fill="#ffffff">Page {n}</text></svg>',
+                f'<text x="80" y="120" fill="#ffffff">Page {number}</text></svg>',
                 encoding="utf-8",
             )
+
         handoff = module.build(project)
         assert handoff["status"] == "ready" and handoff["slide_count"] == 2
+        assert handoff["changed_slide_count"] == 2 and handoff["previous_review"] is None
         html = Path(handoff["launch_path"]).read_text(encoding="utf-8")
-        assert "Page 1" in html and "Page 2" in html
-        assert "ppt-master-static-deck-review-response/v1" in html
+        assert "Page 1" in html and "历史信息只用于定位变化" in html
+
         response = {
             "schema": "ppt-master-static-deck-review-response/v1",
             "surface": "deck-review",
@@ -43,13 +45,28 @@ def main() -> int:
             "changes": [{"slide": "P02.svg", "ordinal": 2, "comment": "Reduce density."}],
         }
         receipt = module.apply_response(project, response)
-        assert receipt["status"] == "validated-and-persisted-by-pinned-harness"
-        assert receipt["result"] == "changes-requested" and receipt["changes_count"] == 1
+        assert receipt["result"] == "changes-requested" and receipt["reviewed_slide_count"] == 2
 
-        # Any SVG mutation invalidates the old approval hash.
-        (out / "P02.svg").write_text((out / "P02.svg").read_text() + "\n<!-- changed -->\n")
+        unchanged = module.build(project)
+        assert unchanged["changed_slide_count"] == 0
+        manifest = json.loads(Path(unchanged["manifest_path"]).read_text(encoding="utf-8"))
+        by_slide = {row["slide"]: row for row in manifest["slides"]}
+        assert by_slide["P01.svg"]["review_delta"] == "unchanged"
+        assert by_slide["P01.svg"]["previous_decision"] == "approved"
+        assert by_slide["P02.svg"]["previous_decision"] == "changes"
+
+        (out / "P02.svg").write_text(
+            (out / "P02.svg").read_text(encoding="utf-8") + "\n<!-- changed -->\n",
+            encoding="utf-8",
+        )
         newer = module.build(project)
         assert newer["svg_roster_sha256"] != handoff["svg_roster_sha256"]
+        assert newer["changed_slide_count"] == 1
+        manifest = json.loads(Path(newer["manifest_path"]).read_text(encoding="utf-8"))
+        by_slide = {row["slide"]: row for row in manifest["slides"]}
+        assert by_slide["P02.svg"]["review_delta"] == "changed"
+        assert newer["previous_review"]["approval_reuse_allowed"] is False
+
         try:
             module.apply_response(project, response)
         except RuntimeError as exc:
