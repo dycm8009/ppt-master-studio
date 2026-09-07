@@ -34,6 +34,16 @@ Do not preload Studio workflow/template/UI/motion/QA policy because the official
 
 Load an adapter only when the active official route reaches its surface. A Host adapter may change transport or persistence; it may not invent a second PPT workflow, Gate schema, template policy, image policy, motion policy, recovery policy, or QA authority.
 
+### Interaction state — truthful host claims
+
+When a project already exists and the next user-facing statement depends on the current state of Confirm UI, Hosted SVG Editor, Storyboard, or Deck Review, the host may run:
+
+`python3 studio/host/cloudflare/interaction_status.py <project_path>`
+
+The helper projects only evidence already present in the project. Its `access_provided` value is deliberately `null`: a generated HTML file, remote session, or `launch_ready` flag cannot prove that the ChatGPT client actually rendered a usable link/file to the user. Treat access as provided only after the host has actually emitted the corresponding user-accessible transport in the current turn. The helper also cannot see a remote capture that has not yet been pulled or returned; never promote a pending capture to `validated` or `applied` from absence of local evidence.
+
+Use the projected `generated`, `launch_ready`, `user_submitted`, `validated`, `applied`, and `stale` distinctions when status wording matters. The helper is observational only and never closes a Gate.
+
 ### Stage 1 / Stage 2 — Cloudflare-hosted official Confirm UI
 
 Prefer the **official pinned Confirm UI frontend** hosted through Cloudflare. Load `studio/host/cloudflare/HOSTED_UI.json` and resolve the immutable Worker URL for the project's pinned 40-hex commit with `studio/host/cloudflare/hosted_url.py`; never silently use a newer `latest` Hosted UI for a RESUME project.
@@ -51,6 +61,12 @@ Do not attempt to install Flask for Hosted Confirm. A missing Flask package is n
 
 The browser bootstrap erases its bearer fragment before entering `/s/<session>`, and confirmation leaves the visible URL short. Never claim that Cloudflare has fed a decision back to ChatGPT merely because the page says `captured-not-validated`; feedback is complete only after a successful pull/apply or after the copied JSON has passed local Harness validation. Do not ask the user to copy a token, long JSON URL, or confirmation JSON when automatic pull has actually succeeded; otherwise use the explicit **Copy confirmation JSON** fallback and never ask them to copy the bootstrap URL itself.
 
+### Storyboard — read-only Design Spec projection
+
+When the official Default Generate route reaches its non-blocking Storyboard stage, run the pinned `skills/ppt-master/scripts/storyboard_handoff.py build <project_path>` command and present its `launch_path` through the host's normal user-accessible file transport when available. The Storyboard is a derived view of the current Design Spec; it owns no decision and produces no confirmation receipt. Do not wait for the user merely because the Storyboard was presented.
+
+If the project may have changed since the Storyboard was built, use the pinned `storyboard_handoff.py status <project_path>` result before re-presenting it. Rebuild when `stale: true`. A user request to revise the Storyboard means revising the owning Design Spec through the official Generate workflow, not editing `storyboard.json` as an independent plan.
+
 ### Executor Live Preview — Cloudflare-hosted official SVG Editor
 
 The official Harness still owns Executor Live Preview and its local `skills/ppt-master/scripts/svg_editor/server.py` behavior. When the execution Runtime actually has outbound HTTPS, `studio/host/cloudflare/hosted_editor_bridge.py` may mirror current `svg_output/`, `images/`, and `assets/` to the immutable commit-bound Worker so the user can operate the **official pinned SVG Editor frontend** remotely.
@@ -67,7 +83,7 @@ For `Generate PPTX — ordinary Default`, after the current final SVG quality re
 
 This produces `<project_path>/live_preview/deck_review.html`, a self-contained review page that embeds sanitized copies of the actual final SVG files. It does **not** render screenshots and does not require Flask, localhost HTTP, Cloudflare, or Runtime outbound network. Present that HTML through the host's normal user-accessible file transport.
 
-The user must explicitly review every slide as `通过` or `需要修改`. The page must remain open after completion and expose the final `ppt-master-static-deck-review-response/v1` JSON for copying. Materialize the copied JSON unchanged and apply it with:
+The user must explicitly review every slide as `通过` or `需要修改`. The page must remain open after completion and expose the final `ppt-master-static-deck-review-response/v1` JSON for copying. A rebuilt surface may highlight which pages changed since the preceding valid review, but that history is navigation evidence only and never reuses approval. Materialize the copied JSON unchanged and apply it with:
 
 `python3 "${SKILL_DIR}/scripts/deck_review_handoff.py" apply-response <project_path> --response-file <response.json>`
 
