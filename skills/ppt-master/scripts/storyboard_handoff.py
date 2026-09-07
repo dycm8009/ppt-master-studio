@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-"""Read-only Storyboard projection from a validated PPT Master Design Spec.
+"""
+PPT Master - Storyboard Handoff
 
-The Design Spec remains the sole authority.  This helper creates a compact JSON
-projection plus a self-contained HTML view for humans to inspect narrative flow,
-page jobs, evidence dependencies, and deterministic risk hints.  It creates no
-new confirmation gate and cannot mutate `design_spec.md`.
+Build a read-only Storyboard projection from a validated Design Spec. The
+Design Spec remains the sole authority; this helper creates no confirmation
+gate and never mutates ``design_spec.md``.
+
+Usage:
+    python3 scripts/storyboard_handoff.py build <project_path>
+    python3 scripts/storyboard_handoff.py status <project_path>
+
+Examples:
+    python3 scripts/storyboard_handoff.py build projects/example
+
+Dependencies:
+    None (only uses standard library)
 """
 from __future__ import annotations
 
@@ -16,6 +26,12 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from console_encoding import configure_utf8_stdio  # noqa: E402
 
 SCHEMA = "ppt-master-storyboard-projection/v1"
 HANDOFF_SCHEMA = "ppt-master-storyboard-handoff/v1"
@@ -224,6 +240,7 @@ def status(project: Path) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Build/read PPT Master Design Spec Storyboard projection")
     sub = parser.add_subparsers(dest="command", required=True)
     b = sub.add_parser("build")
