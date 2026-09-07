@@ -67,3 +67,28 @@ A response is not authoritative until this command succeeds.
 
 Never self-confirm this gate and never infer approval from silence, page visits,
 or an empty browser session.
+
+## 4. Recheck before ordinary Default export or export resume
+
+Run the read-only owning check immediately before the ordinary Default route
+enters Step 7, including a resumed export:
+
+```bash
+python3 "${SKILL_DIR}/scripts/deck_review_handoff.py" assert-approved <project_path>
+```
+
+This command fails unless the current SVG/resource roster, review HTML, user
+response and pinned-Harness receipt agree and the outcome is `approved` with
+zero changes. It writes no approval. Other official export gates still apply.
+Do not add this ordinary Default gate to Quick or native routes by inference.
+
+The manifest binds prepared image/icon bytes as well as raw SVG bytes. Old
+resource-bearing reviews require a rebuild; a resource-free legacy roster
+retains its digest. Only the sanitized preview is embedded; sources are never
+rewritten. Unavailable images, external network references, and browser-unsupported
+media are explicit failures, never silently blank pages or image substitutions.
+
+`status` exposes the same read-only evidence for Host status projection. A
+transport cursor, a missing response, or historical comments cannot approve a
+new roster. Modified user decisions invalidate the browser's copied JSON until
+the user completes the current review again.

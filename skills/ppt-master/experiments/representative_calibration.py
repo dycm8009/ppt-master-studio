@@ -34,13 +34,8 @@ WEIGHTS = {
 
 
 def load_storyboard(project: Path) -> dict[str, Any]:
-    path = project.resolve() / "live_preview" / "storyboard.json"
-    if not path.is_file():
-        raise RuntimeError(f"storyboard missing: {path}; build storyboard_handoff first")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or value.get("schema") != "ppt-master-storyboard-projection/v1":
-        raise RuntimeError("unsupported storyboard schema")
-    return value
+    from storyboard_handoff import load_current
+    return load_current(project)
 
 
 def select(storyboard: dict[str, Any], limit: int = 2) -> dict[str, Any]:
@@ -79,6 +74,7 @@ def select(storyboard: dict[str, Any], limit: int = 2) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "experiment_only": True,
+        "design_spec_sha256": storyboard.get("design_spec_sha256"),
         "generation_rhythm_changed": False,
         "baseline": "current P01 first-page gate + uninterrupted remaining-page generation",
         "max_targets": limit,

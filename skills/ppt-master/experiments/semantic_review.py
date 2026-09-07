@@ -24,7 +24,7 @@ SCHEMA = "ppt-master-semantic-review-experiment/v1"
 
 
 def _norm(value: str) -> str:
-    return re.sub(r"\W+", "", value or "").lower()
+    return re.sub(r"\s+", " ", value or "").strip().casefold()
 
 
 def _issue(
@@ -124,21 +124,18 @@ def review(storyboard: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "experiment_only": True,
+        "design_spec_sha256": storyboard.get("design_spec_sha256"),
         "blocking": False,
         "slide_count": len(slides),
         "issue_count": len(issues),
+        "coverage": "structural text heuristics only; facts, visual topology and PPTX rendering are not verified",
         "issues": issues,
     }
 
 
 def load_storyboard(project: Path) -> dict[str, Any]:
-    path = project.resolve() / "live_preview" / "storyboard.json"
-    if not path.is_file():
-        raise RuntimeError(f"storyboard missing: {path}")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or value.get("schema") != "ppt-master-storyboard-projection/v1":
-        raise RuntimeError("unsupported storyboard schema")
-    return value
+    from storyboard_handoff import load_current
+    return load_current(project)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -154,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
         output = args.output or (
             args.project.resolve() / "validation" / "semantic_review_experiment.json"
         )
+        output = output.resolve()
+        if not output.is_relative_to(args.project.resolve() / "validation"):
+            raise RuntimeError("experiment output must stay under project/validation; source artifacts are read-only")
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
             json.dumps(result, ensure_ascii=False, indent=2) + "\n",

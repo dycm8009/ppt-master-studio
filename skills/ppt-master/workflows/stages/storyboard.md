@@ -46,3 +46,15 @@ A `stale: true` result requires rebuild before any later presentation of the Sto
 ## 3. Quality experiments
 
 **Reference — not a constraint**: `skills/ppt-master/experiments/representative_calibration.py` and `skills/ppt-master/experiments/semantic_review.py` consume the Storyboard only for benchmark work. They are not runtime triggers, do not alter the current `P01 → uninterrupted remaining pages` generation rhythm, and do not create advisory or blocking production gates until separate evaluation justifies an official workflow change.
+
+## 4. Projection integrity
+
+The view is a static snapshot, not a live connection to the source. The owning
+`status` and `load_current` checks reject missing or changed source/HTML,
+modified JSON projection, and duplicate page identity. Rebuild before presenting
+an out-of-date view. Code fences and indentation remain literal content rather
+than page/field syntax. Risk labels are heuristics, not confirmed capabilities.
+
+Both experimental consumers use `load_current` and include the source digest
+in their output. Their results are not evidence of factual correctness, topology
+correctness, native PowerPoint fidelity, or production-quality improvement.

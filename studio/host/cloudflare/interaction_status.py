@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ def _load_object(path: Path) -> dict[str, Any] | None:
         return None
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
 
@@ -65,61 +66,43 @@ def confirm_state(project: Path) -> dict[str, Any]:
     confirm = project / "confirm_ui"
     direct = _load_object(confirm / "hosted_confirm.json")
     browser = _load_object(confirm / "hosted_browser_handoff.json")
-    state = direct or browser
-    result = _load_object(confirm / "result.json")
-    handoff = _load_object(confirm / "template_handoff.json")
-
-    if not state:
-        return _surface(
-            "confirm",
-            authority="pinned-official-confirm-api",
-            next_action="open-confirm-surface",
-        )
-
-    mode = "direct" if direct else "browser-manual-return"
-    active_stage = str(state.get("active_stage") or state.get("last_applied_stage") or "stage1")
-    applied_count = int(state.get("applied_capture_count", 0) or 0)
-    user_submitted = applied_count > 0
-
-    result_stage = str((result or {}).get("stage") or "")
-    result_status = str((result or {}).get("status") or "")
-    stage1_valid = result_stage == "stage1" and result_status == "stage1-confirmed"
-    final_valid = result_stage == "final" and result_status == "confirmed"
-    validated = final_valid or (active_stage == "stage1" and stage1_valid)
-    applied = validated
-
-    if final_valid:
-        next_action = "continue-after-final-confirmation"
-    elif stage1_valid:
-        if handoff and handoff.get("status") == "ready":
-            next_action = "author-or-present-stage2"
-        else:
-            next_action = "complete-template-handoff"
-    elif mode == "browser-manual-return":
-        next_action = "present-launch-or-apply-copied-json"
+    state = direct or browser or {}
+    if not confirm.is_dir():
+        return _surface("confirm", authority="pinned-official-confirm-api", next_action="open-confirm-surface")
+    # Reuse the pinned core's pure state builder: it owns stage progression and
+    # the fresh-template restart rule. Do not reinterpret a cached result here.
+    official = _harness_module("confirm_ui.server")._build_session_state(confirm)
+    active_stage = official.get("current_stage")
+    result_stage = official.get("result_stage")
+    validated = result_stage == "final" or (active_stage == "stage1" and result_stage == "stage1")
+    pin = (_load_object(project / "project_state.json") or {}).get("harness", {})
+    mismatched_pin = bool(isinstance(pin, dict) and pin.get("commit") and state.get("harness_commit")
+                          and pin["commit"] != state["harness_commit"])
+    ambiguous = bool(direct and browser and direct.get("session") != browser.get("session"))
+    stale = mismatched_pin or ambiguous
+    if stale:
+        validated = False
+        action = "resolve-active-pinned-transport"
+    elif result_stage == "final":
+        action = "continue-after-final-confirmation"
+    elif result_stage == "stage1" and active_stage != "stage2":
+        handoff = _load_object(confirm / "template_handoff.json")
+        action = "author-or-present-stage2" if handoff and handoff.get("status") == "ready" else "complete-template-handoff"
+    elif browser:
+        action = "present-launch-or-apply-copied-json"
+    elif direct:
+        action = "present-launch-or-pull-and-apply"
     else:
-        next_action = "present-launch-or-pull-and-apply"
-
-    details = {
-        "transport_mode": state.get("transport_mode"),
-        "feedback_mode": state.get("feedback_mode"),
-        "active_stage": active_stage,
-        "applied_capture_count": applied_count,
-        "result_stage": result_stage or None,
-        "result_status": result_status or None,
-        "harness_commit": state.get("harness_commit"),
-    }
-    return _surface(
-        "confirm",
-        generated=True,
-        launch_ready=bool(state.get("session") and state.get("remote_base")),
-        user_submitted=user_submitted,
-        validated=validated,
-        applied=applied,
-        authority="pinned-official-confirm-api",
-        next_action=next_action,
-        details=details,
-    )
+        action = "use-official-confirm-surface"
+    return _surface("confirm", authority="pinned-official-confirm-api", generated=bool(state or result_stage),
+                    launch_ready=bool(state.get("session") and state.get("remote_base") and not stale),
+                    user_submitted=bool(result_stage and not stale), validated=validated, applied=validated,
+                    stale=stale, next_action=action,
+                    details={"transport_mode": state.get("transport_mode"), "feedback_mode": state.get("feedback_mode"),
+                             "active_stage": active_stage, "result_stage": result_stage,
+                             "harness_commit": state.get("harness_commit"),
+                             "pending_remote_capture": None, "remote_accessibility": "not-probed",
+                             "official_status": official.get("status"), "official_error": official.get("template_error")})
 
 
 def editor_state(project: Path) -> dict[str, Any]:
@@ -130,106 +113,48 @@ def editor_state(project: Path) -> dict[str, Any]:
             authority="pinned-official-svg-editor",
             next_action="open-editor-if-route-requires-it",
         )
-    applied_count = int(state.get("applied_capture_count", 0) or 0)
-    details = {
-        "session": state.get("session"),
-        "harness_commit": state.get("harness_commit"),
-        "applied_capture_count": applied_count,
-        "last_applied_at": state.get("last_applied_at"),
-    }
-    return _surface(
-        "svg-editor",
-        generated=True,
-        launch_ready=bool(state.get("session") and state.get("remote_base")),
-        user_submitted=applied_count > 0,
-        validated=applied_count > 0,
-        applied=applied_count > 0,
-        authority="pinned-official-svg-editor",
-        next_action="continue-generation-or-apply-new-editor-captures",
-        details=details,
-    )
+    count = state.get("applied_capture_count")
+    count = count if type(count) is int and count >= 0 else 0
+    # A transport cursor is historical evidence, not a content-bound receipt
+    # for the current SVG version or evidence of pending remote edits.
+    return _surface("svg-editor", generated=True,
+                    launch_ready=bool(state.get("session") and state.get("remote_base")),
+                    authority="pinned-official-svg-editor",
+                    next_action="continue-generation-or-apply-new-editor-captures",
+                    details={"historical_applied_capture_count": count,
+                             "current_content_validation": "not-proven-by-transport-cursor",
+                             "pending_remote_capture": None, "remote_accessibility": "not-probed"})
+
+
+def _harness_module(name: str):
+    scripts = Path(__file__).resolve().parents[3] / "skills/ppt-master/scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import importlib.util
+    source = scripts / (name.replace(".", "/") + ".py")
+    spec = importlib.util.spec_from_file_location("ppt_master_status_" + name.replace(".", "_"), source)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"pinned Harness module unavailable: {source}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def deck_review_state(project: Path) -> dict[str, Any]:
-    runtime = project / "live_preview"
-    manifest = _load_object(runtime / "deck_review_manifest.json")
-    response = _load_object(runtime / "deck_review_response.json")
-    receipt = _load_object(runtime / "deck_review_receipt.json")
-    html_path = runtime / "deck_review.html"
-    if not manifest:
-        return _surface(
-            "deck-review",
-            authority="pinned-deck-review-handoff",
-            next_action="build-deck-review-after-final-svg-quality-pass",
-        )
-
-    roster_hash = str(manifest.get("svg_roster_sha256") or "")
-    receipt_hash = str((receipt or {}).get("svg_roster_sha256") or "")
-    response_hash = str((response or {}).get("svg_roster_sha256") or "")
-    current_receipt = bool(receipt and receipt_hash == roster_hash)
-    current_response = bool(response and response_hash == roster_hash)
-    stale = bool(receipt and receipt_hash and receipt_hash != roster_hash)
-    result = str((receipt or {}).get("result") or "") if current_receipt else ""
-
-    if result == "approved" and int((receipt or {}).get("changes_count", 0) or 0) == 0:
-        next_action = "continue-to-export"
-    elif result == "changes-requested":
-        next_action = "apply-requested-changes-and-rebuild-review"
-    else:
-        next_action = "present-review-html-and-apply-user-response"
-
-    details = {
-        "svg_roster_sha256": roster_hash,
-        "slide_count": manifest.get("slide_count"),
-        "changed_slide_count": manifest.get("changed_slide_count"),
-        "previous_review": manifest.get("previous_review"),
-        "receipt_result": result or None,
-    }
-    return _surface(
-        "deck-review",
-        generated=True,
-        launch_ready=html_path.is_file(),
-        user_submitted=current_response,
-        validated=current_receipt,
-        applied=current_receipt,
-        stale=stale,
-        authority="pinned-deck-review-handoff",
-        next_action=next_action,
-        details=details,
-    )
+    observed = _harness_module("deck_review_handoff").review_status(project)
+    return _surface("deck-review", authority="pinned-deck-review-handoff",
+                    **{key: observed[key] for key in ("generated", "launch_ready", "user_submitted",
+                                                     "validated", "applied", "stale", "next_action")},
+                    details={**observed, "scope": "Deck Review only; other official export gates still apply"})
 
 
 def storyboard_state(project: Path) -> dict[str, Any]:
-    runtime = project / "live_preview"
-    manifest = _load_object(runtime / "storyboard.json")
-    html_path = runtime / "storyboard.html"
-    spec = project / "design_spec.md"
-    if not manifest:
-        return _surface(
-            "storyboard",
-            authority="design-spec-read-only-projection",
-            next_action="build-after-design-spec-is-valid",
-        )
-
-    stale = False
-    if spec.is_file():
-        import hashlib
-
-        current = hashlib.sha256(spec.read_bytes()).hexdigest()
-        stale = current != str(manifest.get("design_spec_sha256") or "")
-    return _surface(
-        "storyboard",
-        generated=True,
-        launch_ready=html_path.is_file(),
-        stale=stale,
-        authority="design-spec-read-only-projection",
-        next_action="rebuild-storyboard" if stale else "optional-read-only-review",
-        details={
-            "design_spec_sha256": manifest.get("design_spec_sha256"),
-            "slide_count": manifest.get("slide_count"),
-            "risk_counts": manifest.get("risk_counts"),
-        },
-    )
+    observed = _harness_module("storyboard_handoff").status(project)
+    return _surface("storyboard", authority="design-spec-read-only-projection",
+                    generated=(project / "live_preview/storyboard.json").is_file(),
+                    launch_ready=observed.get("status") == "current", stale=observed.get("stale", False),
+                    next_action="optional-read-only-review" if observed.get("status") == "current" else
+                                "rebuild-storyboard", details=observed)
 
 
 def project_status(project: Path) -> dict[str, Any]:
@@ -258,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(project_status(args.project), ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        print(f"interaction_status: {exc}", file=__import__("sys").stderr)
+        print(f"interaction_status: {exc}", file=sys.stderr)
         return 1
 
 
