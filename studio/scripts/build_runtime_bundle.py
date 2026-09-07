@@ -29,6 +29,7 @@ RUNTIME_INPUTS = (
     "studio/host/cloudflare/hosted_confirm_handoff.py",
     "studio/host/cloudflare/hosted_confirm_bridge.py",
     "studio/host/cloudflare/hosted_editor_bridge.py",
+    "studio/host/cloudflare/interaction_status.py",
 )
 
 IGNORED_NAMES = {"__pycache__", ".DS_Store"}

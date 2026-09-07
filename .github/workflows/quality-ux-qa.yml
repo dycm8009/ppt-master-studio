@@ -1,0 +1,54 @@
+name: Quality UX Adversarial QA
+
+on:
+  pull_request:
+    branches: [studio-main]
+    paths:
+      - 'skills/ppt-master/**'
+      - 'studio/**'
+      - '.github/workflows/quality-ux-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  behavioral-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify distributed Harness identity
+        run: python skills/ppt-master/scripts/attribution_guard.py
+      - name: Adversarial Python contracts
+        run: |
+          set -o pipefail
+          python -S studio/tests/quality_ux_adversarial_test.py 2>&1 | tee /tmp/quality-ux-python.log
+      - name: Install Chromium test environment
+        if: ${{ !cancelled() }}
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Actual SVG browser behavior
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          python studio/tests/quality_ux_browser_test.py 2>&1 | tee /tmp/quality-ux-browser.log
+      - name: Preserve exact tracked source for failure reproduction
+        if: failure()
+        run: |
+          git rev-parse HEAD > /tmp/quality-ux-source.sha
+          git archive --format=zip --output=/tmp/quality-ux-source.zip HEAD
+      - name: Upload QA evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-ux-qa-evidence
+          retention-days: 3
+          path: /tmp/quality-ux-*
+          if-no-files-found: error
