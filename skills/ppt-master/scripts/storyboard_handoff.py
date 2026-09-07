@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Read-only Storyboard projection from a validated PPT Master Design Spec.
+
+The Design Spec remains the sole authority.  This helper creates a compact JSON
+projection plus a self-contained HTML view for humans to inspect narrative flow,
+page jobs, evidence dependencies, and deterministic risk hints.  It creates no
+new confirmation gate and cannot mutate `design_spec.md`.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+SCHEMA = "ppt-master-storyboard-projection/v1"
+HANDOFF_SCHEMA = "ppt-master-storyboard-handoff/v1"
+SLIDE_RE = re.compile(r"^####\s+Slide\s+(\d+)\s*-\s*(.+?)\s*$", re.IGNORECASE)
+PART_RE = re.compile(r"^###\s+Part\s+\d+\s*:\s*(.+?)\s*$", re.IGNORECASE)
+FIELD_RE = re.compile(r"^-\s+\*\*(.+?)\*\*:\s*(.*)$")
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _clean(value: str) -> str:
+    return "\n".join(line.rstrip() for line in value.strip().splitlines()).strip()
+
+
+def _parse_fields(lines: list[str]) -> dict[str, str]:
+    fields: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in lines:
+        match = FIELD_RE.match(line)
+        if match:
+            current = match.group(1).strip()
+            fields.setdefault(current, []).append(match.group(2).strip())
+            continue
+        if current is not None:
+            fields[current].append(line.strip())
+    return {key: _clean("\n".join(value)) for key, value in fields.items()}
+
+
+def _risk_tags(fields: dict[str, str]) -> list[str]:
+    tags: set[str] = set()
+    content = fields.get("Content", "")
+    combined = "\n".join(fields.values())
+    viz = fields.get("Visualization", "")
+    native = fields.get("Native-ready", "")
+    if len(content) >= 650 or content.count("\n") >= 6:
+        tags.add("dense-content")
+    if viz or native:
+        tags.add("visualization")
+    if re.search(r"\b(chart|table)\b|图表|表格|数据图", f"{viz}\n{content}", re.IGNORECASE):
+        tags.add("chart-or-table")
+    if fields.get("Images"):
+        tags.add("images")
+    if fields.get("Mathematical content"):
+        tags.add("formula")
+    if fields.get("Motion suggestion"):
+        tags.add("motion")
+    if fields.get("Fact IDs"):
+        tags.add("source-sensitive")
+    if re.search(r"```|\b(code|snippet|function|class|C\+\+|API)\b|代码", combined, re.IGNORECASE):
+        tags.add("code-or-api")
+    return sorted(tags)
+
+
+def parse_design_spec(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise RuntimeError(f"design_spec.md missing: {path}")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        ix = next(i for i, line in enumerate(lines) if line.strip() == "## IX. Content Outline")
+    except StopIteration as exc:
+        raise RuntimeError("Design Spec is missing `## IX. Content Outline`") from exc
+    end = next(
+        (i for i in range(ix + 1, len(lines)) if lines[i].startswith("## X.")),
+        len(lines),
+    )
+
+    slides: list[dict[str, Any]] = []
+    current_part = ""
+    i = ix + 1
+    while i < end:
+        part_match = PART_RE.match(lines[i])
+        if part_match:
+            current_part = part_match.group(1).strip()
+            i += 1
+            continue
+        slide_match = SLIDE_RE.match(lines[i])
+        if not slide_match:
+            i += 1
+            continue
+        number = int(slide_match.group(1))
+        header_name = slide_match.group(2).strip()
+        block: list[str] = []
+        i += 1
+        while i < end and not SLIDE_RE.match(lines[i]) and not PART_RE.match(lines[i]):
+            block.append(lines[i])
+            i += 1
+        fields = _parse_fields(block)
+        title = fields.get("Title") or header_name
+        slide = {
+            "slide_id": f"P{number:02d}",
+            "ordinal": len(slides) + 1,
+            "source_number": number,
+            "section": current_part or None,
+            "header_name": header_name,
+            "title": title,
+            "audience_move": fields.get("Audience move", ""),
+            "core_message": fields.get("Core message", ""),
+            "layout": fields.get("Layout", ""),
+            "content": fields.get("Content", ""),
+            "evidence": fields.get("Fact IDs", ""),
+            "visualization": fields.get("Visualization", ""),
+            "images": fields.get("Images", ""),
+            "mathematical_content": fields.get("Mathematical content", ""),
+            "motion_suggestion": fields.get("Motion suggestion", ""),
+            "native_ready": fields.get("Native-ready", ""),
+            "risk_tags": _risk_tags(fields),
+            "fields": fields,
+        }
+        slides.append(slide)
+
+    if not slides:
+        raise RuntimeError("Design Spec §IX contains no `#### Slide NN - ...` blocks")
+    for index, slide in enumerate(slides):
+        slide["previous_slide"] = slides[index - 1]["slide_id"] if index else None
+        slide["next_slide"] = slides[index + 1]["slide_id"] if index + 1 < len(slides) else None
+    counts = Counter(tag for slide in slides for tag in slide["risk_tags"])
+    return {
+        "schema": SCHEMA,
+        "design_spec_sha256": _sha(path),
+        "slide_count": len(slides),
+        "risk_counts": dict(sorted(counts.items())),
+        "slides": slides,
+    }
+
+
+def _page_html(storyboard: dict[str, Any]) -> str:
+    payload = json.dumps(storyboard, ensure_ascii=False).replace("</", "<\\/")
+    return f'''<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PPT Master Studio · Storyboard</title>
+<style>
+:root{{--bg:#0b1020;--panel:#121a2b;--line:#2d3b52;--text:#dbe6f5;--muted:#8fa1b8;--accent:#65a9ff;--risk:#ffbd66}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,"Noto Sans CJK SC",system-ui,sans-serif}}
+#app{{height:100vh;display:grid;grid-template-columns:260px minmax(0,1fr)}} aside{{background:var(--panel);border-right:1px solid var(--line);overflow:auto}} main{{overflow:auto;padding:28px}}
+.header{{padding:18px;border-bottom:1px solid var(--line);font-weight:750}} .meta{{font-size:12px;color:var(--muted);margin-top:5px}} #list{{padding:10px}}
+.item{{width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--text);padding:10px;border-radius:8px;margin:3px 0;cursor:pointer}} .item:hover,.item.active{{background:#19253b;border-color:#334762}} .section{{font-size:11px;color:var(--muted)}}
+.card{{max-width:1100px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px}} h1{{font-size:26px;margin:0 0 4px}} h2{{font-size:13px;color:var(--accent);margin:22px 0 7px;text-transform:uppercase;letter-spacing:.05em}} .value{{white-space:pre-wrap}} .muted{{color:var(--muted)}} .tags{{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}} .tag{{border:1px solid #705f3c;color:var(--risk);padding:3px 7px;border-radius:999px;font-size:11px}} .flow{{display:flex;gap:8px;margin-top:20px}} .flow button{{border:1px solid #3e526f;background:#18243a;color:var(--text);padding:7px 10px;border-radius:7px;cursor:pointer}} .flow button:disabled{{opacity:.35}}
+</style></head>
+<body><div id="app"><aside><div class="header">Storyboard<div class="meta" id="summary"></div></div><div id="list"></div></aside><main><div class="card" id="card"></div></main></div>
+<script>
+const data={payload}; let index=0; const $=id=>document.getElementById(id);
+function esc(s){{return String(s||'').replace(/[&<>"']/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]))}}
+function row(label,value){{return value?`<h2>${{esc(label)}}</h2><div class="value">${{esc(value)}}</div>`:''}}
+function renderList(){{$('list').innerHTML=data.slides.map((s,i)=>`<button class="item ${{i===index?'active':''}}" data-i="${{i}}"><div>${{esc(s.slide_id)}} · ${{esc(s.title)}}</div><div class="section">${{esc(s.section||'')}}</div></button>`).join('');document.querySelectorAll('.item').forEach(b=>b.onclick=()=>{{index=Number(b.dataset.i);render()}})}}
+function render(){{const s=data.slides[index];const tags=s.risk_tags.map(t=>`<span class="tag">${{esc(t)}}</span>`).join('');$('card').innerHTML=`<div class="muted">${{esc(s.section||'')}} · ${{s.ordinal}} / ${{data.slide_count}}</div><h1>${{esc(s.title)}}</h1>${{row('Audience move',s.audience_move)}}${{row('Core message',s.core_message)}}${{row('Evidence / source dependency',s.evidence)}}${{row('Layout / visual focus',s.layout)}}${{row('Visualization',s.visualization)}}${{row('Images',s.images)}}${{row('Content',s.content)}}${{row('Mathematical content',s.mathematical_content)}}${{row('Motion suggestion',s.motion_suggestion)}}${{tags?`<h2>Risk hints</h2><div class="tags">${{tags}}</div>`:''}}<div class="flow"><button id="prev">‹ 上一页</button><button id="next">下一页 ›</button></div>`;$('prev').disabled=index===0;$('next').disabled=index===data.slides.length-1;$('prev').onclick=()=>{{index--;render()}};$('next').onclick=()=>{{index++;render()}};renderList()}}
+$('summary').textContent=`${{data.slide_count}} 页 · 只读 Design Spec 投影`;render();
+</script></body></html>'''
+
+
+def build(project: Path) -> dict[str, Any]:
+    project = project.resolve()
+    spec = project / "design_spec.md"
+    storyboard = parse_design_spec(spec)
+    runtime = project / "live_preview"
+    runtime.mkdir(parents=True, exist_ok=True)
+    json_path = runtime / "storyboard.json"
+    html_path = runtime / "storyboard.html"
+    json_path.write_text(json.dumps(storyboard, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    html_path.write_text(_page_html(storyboard), encoding="utf-8")
+    return {
+        "schema": HANDOFF_SCHEMA,
+        "surface": "storyboard",
+        "status": "ready",
+        "authority": "design-spec-read-only-projection",
+        "design_spec_sha256": storyboard["design_spec_sha256"],
+        "slide_count": storyboard["slide_count"],
+        "risk_counts": storyboard["risk_counts"],
+        "launch_path": str(html_path),
+        "manifest_path": str(json_path),
+        "blocking": False,
+        "interaction_state": {
+            "generated": True,
+            "launch_ready": True,
+            "access_provided": None,
+            "user_submitted": False,
+            "validated": False,
+            "applied": False,
+            "stale": False,
+            "next_action": "optional-read-only-review",
+        },
+    }
+
+
+def status(project: Path) -> dict[str, Any]:
+    project = project.resolve()
+    spec = project / "design_spec.md"
+    manifest = project / "live_preview" / "storyboard.json"
+    if not manifest.is_file():
+        return {"schema": HANDOFF_SCHEMA, "surface": "storyboard", "status": "missing", "stale": False}
+    value = json.loads(manifest.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError("storyboard.json is not a JSON object")
+    stale = not spec.is_file() or value.get("design_spec_sha256") != _sha(spec)
+    return {
+        "schema": HANDOFF_SCHEMA,
+        "surface": "storyboard",
+        "status": "stale" if stale else "current",
+        "stale": stale,
+        "design_spec_sha256": value.get("design_spec_sha256"),
+        "slide_count": value.get("slide_count"),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Build/read PPT Master Design Spec Storyboard projection")
+    sub = parser.add_subparsers(dest="command", required=True)
+    b = sub.add_parser("build")
+    b.add_argument("project", type=Path)
+    s = sub.add_parser("status")
+    s.add_argument("project", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        result = build(args.project) if args.command == "build" else status(args.project)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    except Exception as exc:
+        print(f"storyboard_handoff: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
