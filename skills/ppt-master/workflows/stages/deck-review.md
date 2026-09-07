@@ -28,6 +28,16 @@ change request requires a concrete comment. The final action generates one
 `ppt-master-static-deck-review-response/v1` JSON object and never auto-closes the
 page.
 
+When a preceding valid Review manifest/receipt pair exists, a rebuild may mark
+current slides as `unchanged`, `changed`, or `added` and display the preceding
+page decision as navigation context. The manifest also reports removed slides.
+This history is evidence only and sets `approval_reuse_allowed: false`.
+
+**Hard rule — no approval reuse**: every rebuilt SVG roster requires a fresh
+explicit decision on every current slide and a new receipt for the new roster
+hash. A visually unchanged slide, a prior `approved` decision, or a zero-change
+delta never preselects or auto-submits the current decision.
+
 Present `launch_path` through the host's normal user-accessible file transport.
 Do not replace it with PNG/JPEG screenshots or a contact sheet.
 
